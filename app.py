@@ -20,7 +20,6 @@ from utils.narratives import source_citation
 from components.employment_trends import render as render_trends
 from components.growth_quadrant import render as render_growth_quadrant
 from components.firm_formation import render as render_firm_formation
-from components.specialties import render as render_specialties
 from components.employment_treemap import render as render_employment_treemap
 
 # ── Page config ───────────────────────────────────────────────────────────────
@@ -83,6 +82,8 @@ st.markdown(f"""
         text-transform: uppercase;
         letter-spacing: 0.5px;
         margin-bottom: 0.2rem;
+        min-height: 1.8rem;
+        line-height: 0.9rem;
     }}
     .kpi-value {{
         font-size: 1.4rem;
@@ -289,7 +290,7 @@ def _secondary_row_html(secondary: dict) -> str:
 
     return (
         f'<div class="kpi-row secondary">'
-        f'<div class="kpi-item"><div class="kpi-label">Inflation-adjusted GDP</div>'
+        f'<div class="kpi-item"><div class="kpi-label">Real GDP</div>'
         f'<div class="kpi-value">{gdp_value}</div>{gdp_delta}{gdp_period}</div>'
         f'<div class="kpi-item"><div class="kpi-label">Unemployment rate</div>'
         f'<div class="kpi-value">{unr_value}</div>{unr_delta}{unr_period}</div>'
@@ -338,10 +339,6 @@ def _render_county_tab(county_df: pd.DataFrame, county_name: str):
     # Firm Openings & Closings
     st.divider()
     render_firm_formation(county_df)
-
-    # Industry Specialization
-    st.divider()
-    render_specialties(county_df)
 
 
 st.divider()

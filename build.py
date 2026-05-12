@@ -24,7 +24,7 @@ from data.fetch import fetch_all_data
 from data.clean import (
     clean, get_total_covered, get_latest_quarter, get_growth_quadrant_data,
 )
-from data.analysis import deseasonalize_trend, project_trend
+from data.analysis import deseasonalize_trend, project_trend, periods_to_current_quarter
 from components.growth_quadrant import (
     build_figure as build_growth_quadrant_fig,
     METHODOLOGY_NOTE as _GROWTH_QUADRANT_TEXT,
@@ -32,7 +32,7 @@ from components.growth_quadrant import (
 GROWTH_QUADRANT_NOTE = f'<p class="source"><em>{_GROWTH_QUADRANT_TEXT}</em></p>'
 from data.constants import (
     FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_GRAY,
-    FAU_ELECTRIC_BLUE, FAU_SKY_BLUE, FAU_STONE, COUNTY_COLORS,
+    FAU_ELECTRIC_BLUE, FAU_SKY_BLUE, COUNTY_COLORS,
 )
 from utils.formatting import fmt_number, fmt_currency, fmt_pct
 from utils.narratives import narrate_employment_trends, format_industry_list
@@ -92,6 +92,8 @@ h1, h2, h3, h4 { color: """ + FAU_BLUE + """; }
     letter-spacing: 0.5px;
     margin-bottom: 0.2rem;
     color: """ + FAU_DARK_GRAY + """;
+    min-height: 1.8rem;
+    line-height: 0.9rem;
 }
 .kpi-value { font-size: 1.4rem; font-weight: 700; color: """ + FAU_BLUE + """; }
 .kpi-delta { font-size: 0.8rem; margin-top: 0.1rem; }
@@ -186,10 +188,12 @@ Object.keys(figureData).forEach(function(divId) {
 
 SOURCE = '<p class="source">Source: <a href="https://www.bls.gov/cew/">BLS QCEW</a> — Quarterly</p>'
 TRENDS_NOTE = (
-    '<p class="source"><em>Trend computed via STL decomposition (period=4, robust); '
-    'salary on log scale. Projection extrapolates a linear fit through the last 4 '
-    'trend points two quarters forward. BLS does not publish seasonally adjusted '
-    'QCEW — this is a custom estimate.</em></p>'
+    '<p class="source"><em>Chart shows the STL trend (raw quarterly values omitted '
+    'for clarity). Trend computed via STL decomposition (period=4, robust); salary '
+    'on log scale. Projection extrapolates a linear fit through the last 4 trend '
+    'points to the current calendar quarter — the horizon shrinks as new QCEW data '
+    'is published. BLS does not publish seasonally adjusted QCEW — this is a custom '
+    'estimate.</em></p>'
 )
 
 
@@ -248,7 +252,7 @@ def _secondary_row_html(secondary):
 
     return (
         f'<div class="kpi-row secondary">'
-        f'<div class="kpi-item"><div class="kpi-label">Inflation-adjusted GDP</div>'
+        f'<div class="kpi-item"><div class="kpi-label">Real GDP</div>'
         f'<div class="kpi-value">{gdp_value}</div>{gdp_delta}{gdp_period}</div>'
         f'<div class="kpi-item"><div class="kpi-label">Unemployment rate</div>'
         f'<div class="kpi-value">{unr_value}</div>{unr_delta}{unr_period}</div>'
@@ -294,9 +298,8 @@ def build_kpi_card(county_df, county_name, color, secondary=None):
 # and returns the HTML for that dashboard section.
 
 def _trends_chart(totals, y_col, title, color, tickformat, hover_prefix, log_transform):
-    """Side-by-side raw + STL-trend chart for the trends section."""
+    """Side-by-side STL-trend chart with linear projection through the current quarter."""
     indexed = totals.set_index("date").sort_index()
-    raw = indexed[y_col]
     labels = indexed["year_qtr"]
 
     stl_input = totals[~totals.get("is_suppressed", False).fillna(False)]
@@ -304,21 +307,20 @@ def _trends_chart(totals, y_col, title, color, tickformat, hover_prefix, log_tra
     trend = deseasonalize_trend(
         stl_input.set_index("date")[y_col].sort_index(),
         log_transform=log_transform,
-    ).reindex(raw.index)
+    ).reindex(indexed.index)
 
     hovertemplate = (
         "%{customdata}<br>%{fullData.name}: " + hover_prefix + "%{y:,.0f}<extra></extra>"
     )
 
-    projection = project_trend(trend, periods=2, lookback=4, log_transform=log_transform)
+    trend_observed = trend.dropna()
+    periods = (
+        periods_to_current_quarter(trend_observed.index[-1])
+        if not trend_observed.empty else 0
+    )
+    projection = project_trend(trend, periods=periods, lookback=4, log_transform=log_transform)
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=raw.index, y=raw.values, customdata=labels.values,
-        mode="lines+markers", name="Raw",
-        line=dict(color=FAU_STONE, dash="dash", width=1.5),
-        marker=dict(size=5, color=FAU_STONE), hovertemplate=hovertemplate,
-    ))
     fig.add_trace(go.Scatter(
         x=trend.index, y=trend.values, customdata=labels.values,
         mode="lines", name="Trend",
@@ -448,9 +450,6 @@ def build_growth_quadrant(county_df, county_name, county_id, figures):
 from components.firm_formation import METHODOLOGY_NOTE as _FIRM_FORMATION_TEXT
 FIRM_FORMATION_NOTE = f'<p class="source"><em>{_FIRM_FORMATION_TEXT}</em></p>'
 
-from components.specialties import METHODOLOGY_NOTE as _SPECIALTIES_TEXT
-SPECIALTIES_NOTE = f'<p class="source"><em>{_SPECIALTIES_TEXT}</em></p>'
-
 from components.employment_treemap import METHODOLOGY_NOTE as _EMPLOYMENT_TREEMAP_TEXT
 EMPLOYMENT_TREEMAP_NOTE = f'<p class="source"><em>{_EMPLOYMENT_TREEMAP_TEXT}</em></p>'
 
@@ -502,41 +501,6 @@ def build_firm_formation(county_df, county_name, county_id, figures):
 
 # ── HTML Assembly ────────────────────────────────────────────────────────────
 
-def build_specialties(county_df, county_name, county_id, figures):
-    """Industry Specialization — horizontal LQ bars with FAU band coloring."""
-    from components.specialties import build_figure as specialties_fig
-    from data.clean import get_specialties_data
-
-    plot_data = get_specialties_data(county_df)
-    if plot_data.empty:
-        return '<div class="section"><h2>Industry Specialization</h2><p>No disclosable specialization data.</p></div>'
-
-    year, qtr = int(plot_data["year"].iloc[0]), int(plot_data["qtr"].iloc[0])
-    strong = plot_data[plot_data["lq_month3_emplvl"] >= 1.25].nlargest(3, "lq_month3_emplvl")
-    if len(strong) == 0:
-        narrative = (
-            f"In {year} Q{qtr}, no 2-digit NAICS sector exceeded 1.25× the U.S. "
-            f"concentration after applying the 1,000-job floor."
-        )
-    else:
-        names = strong["industry_label"].tolist()
-        narrative = (
-            f"In {year} Q{qtr}, the county's strongest specialties — industries with "
-            f"workforce concentrations of 1.25× the U.S. average or greater — are "
-            f"{format_industry_list(names)}."
-        )
-
-    fig = specialties_fig(plot_data)
-    div_id = f"{county_id}-specialties"
-    figures[div_id] = _fig_json(fig)
-
-    return (
-        f'<div class="section"><h2>Industry Specialization</h2>'
-        f'<p>{narrative}</p>'
-        f'<div id="{div_id}" class="plotly-chart"></div>{SOURCE}{SPECIALTIES_NOTE}</div>'
-    )
-
-
 def build_employment_treemap(county_df, county_name, county_id, figures):
     """Workforce Composition — multi-trace treemap with year-selector buttons."""
     from components.employment_treemap import build_figure as treemap_fig
@@ -570,7 +534,7 @@ def build_employment_treemap(county_df, county_name, county_id, figures):
 
 SECTION_BUILDERS = [
     build_trends, build_employment_treemap, build_growth_quadrant,
-    build_firm_formation, build_specialties,
+    build_firm_formation,
 ]
 
 

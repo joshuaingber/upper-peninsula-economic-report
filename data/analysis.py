@@ -28,6 +28,28 @@ def _next_quarter_dates(last_date: pd.Timestamp, periods: int) -> pd.DatetimeInd
     return pd.DatetimeIndex(out)
 
 
+def periods_to_current_quarter(last_trend_date: pd.Timestamp,
+                               today: pd.Timestamp | None = None) -> int:
+    """Number of quarters from `last_trend_date` to the current calendar quarter.
+
+    Returns 0 if the trend already reaches (or exceeds) the current quarter.
+    Used by trend-chart callers to set the projection horizon dynamically:
+    the projection always extends through the current calendar quarter.
+
+    >>> periods_to_current_quarter(pd.Timestamp("2025-08-01"), pd.Timestamp("2026-05-12"))
+    3
+    >>> periods_to_current_quarter(pd.Timestamp("2025-08-01"), pd.Timestamp("2025-08-15"))
+    0
+    >>> periods_to_current_quarter(pd.Timestamp("2025-11-01"), pd.Timestamp("2026-02-15"))
+    1
+    >>> periods_to_current_quarter(pd.Timestamp("2025-08-01"), pd.Timestamp("2024-01-01"))
+    0
+    """
+    today = pd.Timestamp.today() if today is None else today
+    diff = (today.to_period("Q") - last_trend_date.to_period("Q")).n
+    return max(0, diff)
+
+
 def project_trend(
     trend: pd.Series,
     periods: int = 2,

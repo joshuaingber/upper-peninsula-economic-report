@@ -6,17 +6,18 @@ from __future__ import annotations
 import plotly.graph_objects as go
 import pandas as pd
 
-from data.analysis import deseasonalize_trend, project_trend
+from data.analysis import deseasonalize_trend, project_trend, periods_to_current_quarter
 from data.clean import get_total_covered
-from data.constants import COUNTY_COLORS, FAU_BLUE, FAU_STONE, FAU_SKY_BLUE
+from data.constants import COUNTY_COLORS, FAU_BLUE, FAU_SKY_BLUE
 from utils.formatting import fmt_currency
 from utils.narratives import narrate_employment_trends, source_citation
 
 METHODOLOGY_NOTE = (
+    "Chart shows the STL trend (raw quarterly values omitted for clarity). "
     "Trend computed via STL decomposition (period=4, robust); salary on log scale. "
-    "Projection extrapolates a linear fit through the last 4 trend points two "
-    "quarters forward. BLS does not publish seasonally adjusted QCEW — this is a "
-    "custom estimate."
+    "Projection extrapolates a linear fit through the last 4 trend points to the "
+    "current calendar quarter — the horizon shrinks as new QCEW data is published. "
+    "BLS does not publish seasonally adjusted QCEW — this is a custom estimate."
 )
 
 
@@ -37,31 +38,24 @@ def _build_chart(
     log_transform: bool,
 ) -> go.Figure:
     indexed = totals.set_index("date").sort_index()
-    raw_series = indexed[y_col]
     labels = indexed["year_qtr"]
     trend = deseasonalize_trend(_trend_input(totals, y_col), log_transform=log_transform)
-    trend = trend.reindex(raw_series.index)
+    trend = trend.reindex(indexed.index)
 
-    # 2-quarter linear projection from the last 4 trend points.
-    projection = project_trend(trend, periods=2, lookback=4, log_transform=log_transform)
+    # Linear projection from the last 4 trend points, extended to the current
+    # calendar quarter (shrinks as new QCEW data is published).
+    trend_observed = trend.dropna()
+    periods = (
+        periods_to_current_quarter(trend_observed.index[-1])
+        if not trend_observed.empty else 0
+    )
+    projection = project_trend(trend, periods=periods, lookback=4, log_transform=log_transform)
 
     hovertemplate = (
         "%{customdata}<br>%{fullData.name}: " + hover_prefix + "%{y:,.0f}<extra></extra>"
     )
 
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=raw_series.index,
-            y=raw_series.values,
-            customdata=labels.values,
-            mode="lines+markers",
-            name="Raw",
-            line=dict(color=FAU_STONE, dash="dash", width=1.5),
-            marker=dict(size=5, color=FAU_STONE),
-            hovertemplate=hovertemplate,
-        )
-    )
     fig.add_trace(
         go.Scatter(
             x=trend.index,

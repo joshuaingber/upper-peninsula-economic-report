@@ -177,9 +177,6 @@ def latest_irs_net(df_irs: pd.DataFrame, county_name: str) -> dict:
     }
 
 
-MIN_EMPLOYMENT_LQ = 1000  # Noise floor: small sectors can swing LQ on a single firm.
-
-
 def get_employment_treemap_data(
     df: pd.DataFrame, year: Optional[int] = None
 ) -> pd.DataFrame:
@@ -256,22 +253,6 @@ def get_treemap_snapshots(df: pd.DataFrame) -> list:
         if not snap.empty:
             snapshots.append((year, qtr, snap))
     return snapshots
-
-
-def get_specialties_data(df: pd.DataFrame, top_n: int = 12) -> pd.DataFrame:
-    """Latest-quarter NAICS sectors with valid employment LQ, top N by LQ.
-
-    Filters to own_code=5 (private), drops suppressed/Unclassified rows,
-    requires employment >= MIN_EMPLOYMENT_LQ to avoid LQ noise in tiny sectors.
-    """
-    sectors = get_latest_quarter(get_naics_sectors(df, own_code=5))
-    sectors = sectors[
-        (~sectors["is_suppressed"])
-        & (sectors["industry_label"] != "Unclassified")
-        & (sectors["employment"] >= MIN_EMPLOYMENT_LQ)
-        & sectors["lq_month3_emplvl"].notna()
-    ]
-    return sectors.nlargest(top_n, "lq_month3_emplvl").copy()
 
 
 def get_national_qoq_pct(df_national: pd.DataFrame) -> pd.Series:
