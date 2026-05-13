@@ -38,6 +38,7 @@ def build_figure(
     national_pct: pd.Series | None = None,
     county_prev_estabs: pd.Series | None = None,
 ) -> go.Figure:
+    """Quarterly establishment additions/losses bars with national benchmark overlay."""
     x = plot_data["year_qtr"]
 
     fig = go.Figure()

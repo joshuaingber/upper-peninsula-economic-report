@@ -17,7 +17,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 
 from data.fetch import fetch_all_data

@@ -1,5 +1,7 @@
 # South Florida Economic Report — Embeddable Iframes
 
+*Canonical embedding guide. Linked from the [root README](../../README.md).*
+
 These pages are self-contained HTML embeds intended to be dropped into the FAU website via `<iframe>`. Each embed mirrors one section of the live dashboard at https://bryanpcutsinger.github.io/south-florida-economic-report/ and is rebuilt automatically every Monday morning by a GitHub Action — no manual refresh needed on either end.
 
 Base URL: `https://bryanpcutsinger.github.io/south-florida-economic-report/embeds/`
@@ -89,3 +91,7 @@ GitHub Pages sends `cache-control: max-age=600`, so individual users may see a 1
 - **Iframe shows a scrollbar / doesn't grow:** the listener snippet above is missing or the origin check is failing. Open the browser's developer console; if you see messages like `Refused to display ...`, FAU's Content-Security-Policy is blocking the embed and IT needs to allow `https://bryanpcutsinger.github.io` in the page's `frame-src` directive.
 - **Charts render at the wrong width:** the iframe is narrower than the recommended minimum. Either widen the column, or accept the overlap on small screens (the embed already stacks its multi-chart layouts vertically below 768 px).
 - **All embeds blank / 404:** the GitHub Action failed its last Monday run. Check https://github.com/bryanpcutsinger/south-florida-economic-report/actions for red workflows.
+
+## Contact
+
+If an embed breaks or you need a chart added, email Bryan Cutsinger at bcutsinger@fau.edu.

@@ -34,6 +34,7 @@ def _axis_range(s: pd.Series, target_pad_frac: float = 0.15) -> list[float]:
 
 
 def build_figure(plot_data: pd.DataFrame) -> go.Figure:
+    """Year-over-year employment vs. wage growth quadrant scatter, bubble-sized by employment."""
     x = plot_data["oty_month3_emplvl_pct_chg"]
     y = plot_data["oty_avg_wkly_wage_pct_chg"]
     x_range = _axis_range(x)
