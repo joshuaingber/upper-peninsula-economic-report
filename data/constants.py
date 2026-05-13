@@ -78,6 +78,7 @@ INDUSTRY_DOMAIN_COLORS = {
 # 77 = NAICS 5-digit
 # 78 = NAICS 6-digit
 AGGLVL_US_TOTAL = 10       # U.S. national total (only valid for area_fips=US000)
+AGGLVL_US_BY_OWN = 11      # U.S. total by ownership; rows for own_codes 1, 2, 3, 5
 
 
 # ── External (non-QCEW) data sources ─────────────────────────────────────────

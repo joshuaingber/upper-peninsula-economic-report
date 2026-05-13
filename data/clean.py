@@ -12,6 +12,7 @@ from data.constants import (
     SUPERSECTOR_LABELS,
     SUPERSECTOR_DOMAIN_CODES,
     AGGLVL_TOTAL,
+    AGGLVL_TOTAL_BY_OWN,
     AGGLVL_NAICS_SECTOR,
 )
 
@@ -146,34 +147,50 @@ def latest_unrate_with_yoy(df_unrate: pd.DataFrame, county_name: str) -> dict:
     """Latest monthly unemployment rate + YoY pp delta for one county.
 
     The FRED LAUS series for these counties are NSA (not seasonally adjusted),
-    so YoY uses a 12-month lookback (same month one year earlier) to neutralize
-    the seasonal pattern instead of comparing to the prior month.
+    so YoY uses a same-month-one-year-prior comparison. Matching is by
+    month-precision date (to_period("M")) rather than positional indexing,
+    so a gap in the monthly series — e.g., the Oct 2025 FRED outage caused
+    by the BLS appropriations lapse — never silently shifts the comparison
+    window. If the prior-year same month is missing, returns {} so the cell
+    falls back to "—".
     """
     if df_unrate.empty:
         return {}
     sub = df_unrate[df_unrate["county_name"] == county_name].sort_values("date")
-    if len(sub) < 13:
+    if sub.empty:
         return {}
     latest = sub.iloc[-1]
-    yoy = sub.iloc[-13]
+    target_period = (latest["date"] - pd.DateOffset(years=1)).to_period("M")
+    prior_matches = sub[sub["date"].dt.to_period("M") == target_period]
+    if prior_matches.empty:
+        return {}
+    prior = prior_matches.iloc[0]
     return {
         "rate": float(latest["value"]),
-        "yoy_delta_pp": float(latest["value"]) - float(yoy["value"]),
+        "yoy_delta_pp": float(latest["value"]) - float(prior["value"]),
         "month_label": latest["date"].strftime("%b %Y"),
     }
 
 
 def latest_irs_net(df_irs: pd.DataFrame, county_name: str) -> dict:
-    """Most recent IRS SOI net domestic-migration figure for one county."""
+    """Most recent IRS SOI net domestic-migration figure for one county.
+
+    Returns both endpoints of the migration window (origin_year, dest_year) so
+    the display can label the figure as a two-year flow rather than collapsing
+    it to a single year. tax_year is retained for backward compatibility.
+    """
     if df_irs.empty:
         return {}
     sub = df_irs[df_irs["county_name"] == county_name]
     if sub.empty:
         return {}
     row = sub.iloc[0]
+    dest_year = int(row["tax_year"])
     return {
         "net_exemptions": int(row["net_exemptions"]),
-        "tax_year": int(row["tax_year"]),
+        "tax_year": dest_year,
+        "origin_year": dest_year - 1,
+        "dest_year": dest_year,
     }
 
 
@@ -255,35 +272,50 @@ def get_treemap_snapshots(df: pd.DataFrame) -> list:
     return snapshots
 
 
-def get_national_qoq_pct(df_national: pd.DataFrame) -> pd.Series:
-    """U.S. quarterly QoQ percent change in establishment count.
+def get_national_qoq_pct(df_national: pd.DataFrame, own_code: int = 5) -> pd.Series:
+    """U.S. quarterly QoQ percent change in establishment count for one ownership type.
 
-    Input is the raw cached national DataFrame (1 row per quarter, total covered,
-    all industries — produced by data.fetch.fetch_national_data). Returns a
-    date-indexed Series of pct change in `qtrly_estabs`; the first quarter
-    drops out (no prior).
+    Defaults to private (own_code=5) so the firm-formation benchmark is
+    apples-to-apples with the county's private-only industry data. Pass
+    own_code=0 to get the all-ownership total covered series. Input is
+    expected to contain both ownership slices per fetch_national_data's
+    expanded filter — older caches without the requested slice return an
+    empty Series and downstream consumers degrade gracefully.
+
+    Returns a date-indexed Series of pct change in qtrly_estabs; the first
+    quarter drops out (no prior).
     """
     if df_national.empty or "qtrly_estabs" not in df_national.columns:
         return pd.Series(dtype=float)
-    df = add_date_column(df_national).sort_values("date").set_index("date")
+    df = df_national[df_national["own_code"] == own_code]
+    if df.empty:
+        return pd.Series(dtype=float)
+    df = add_date_column(df).sort_values("date").set_index("date")
     return df["qtrly_estabs"].pct_change().dropna()
 
 
 def get_firm_formation_data(df: pd.DataFrame) -> pd.DataFrame:
     """Quarterly establishment churn decomposed into industries gaining and losing firms.
 
-    For each (industry, quarter), compute the QoQ change in `qtrly_estabs`. Then
-    aggregate per quarter:
-      - additions   = sum of positive industry-level deltas (industries adding firms)
-      - subtractions = sum of negative industry-level deltas (industries losing firms; ≤ 0)
-      - net         = additions + subtractions = county-wide QoQ change in establishment count
+    For each (industry, quarter), compute the QoQ change in `qtrly_estabs`
+    at (own_code=5, agglvl=74). Then aggregate per quarter:
+      - additions    = sum of positive industry-level deltas (which industries added firms)
+      - subtractions = sum of negative industry-level deltas (which industries lost firms; ≤ 0)
+      - net          = BLS-published QoQ change in the county-private establishment count,
+                       pulled from (own_code=5, agglvl=71).
+
+    `net` does NOT equal `additions + subtractions` because BLS suppresses
+    small-cell industries from the per-sector view at agglvl=74; agglvl=71
+    is a single unsuppressed row per quarter. The visible gap between the
+    stacked bars and the net line is the suppression effect.
 
     Returns a DataFrame indexed by quarter with columns date, year_qtr, additions,
     subtractions, net. The first quarter in the input series is dropped (no QoQ
     change available).
 
     Note: this is *not* gross firm openings/closings (BLS doesn't publish those at
-    the county level). It's industry-level establishment churn aggregated upward.
+    the county level). It's the county-private establishment change, with an
+    industry-level decomposition layered on top.
     """
     sectors = get_naics_sectors(df, own_code=5)
     sectors = sectors[
@@ -298,12 +330,23 @@ def get_firm_formation_data(df: pd.DataFrame) -> pd.DataFrame:
     sectors["estabs_delta"] = sectors.groupby("industry_label")["qtrly_estabs"].diff()
     sectors = sectors.dropna(subset=["estabs_delta"])
 
-    quarterly = (
+    bars = (
         sectors.groupby(["date", "year_qtr"], as_index=False)
         .agg(
             additions=("estabs_delta", lambda s: s[s > 0].sum()),
             subtractions=("estabs_delta", lambda s: s[s < 0].sum()),
         )
     )
-    quarterly["net"] = quarterly["additions"] + quarterly["subtractions"]
-    return quarterly.sort_values("date").reset_index(drop=True)
+
+    # True county-private net from (own_code=5, agglvl=71) — single row per
+    # quarter, no industry-level suppression.
+    county_private = df[
+        (df["own_code"] == 5) & (df["agglvl_code"] == AGGLVL_TOTAL_BY_OWN)
+    ].sort_values("date").set_index("date")
+    net_true = county_private["qtrly_estabs"].diff().rename("net")
+
+    return (
+        bars.merge(net_true, left_on="date", right_index=True, how="left")
+        .sort_values("date")
+        .reset_index(drop=True)
+    )

@@ -101,7 +101,7 @@ def _build_chart(
         paper_bgcolor="white",
         hovermode="x unified",
         height=420,
-        margin=dict(t=50, b=80, l=60, r=20),
+        margin=dict(t=50, b=80, l=80, r=20),
         legend=dict(orientation="h", yanchor="top", y=-0.18, x=0),
         xaxis=dict(
             showgrid=False, title="Quarter",
@@ -109,7 +109,9 @@ def _build_chart(
             ticks="outside", tickcolor="black", ticklen=4,
         ),
         yaxis=dict(
-            showgrid=False, tickformat=tickformat, title=title,
+            showgrid=False, tickformat=tickformat,
+            title=dict(text=title, standoff=15),
+            automargin=True,
             showline=True, linecolor="black", linewidth=2, mirror=False,
             ticks="outside", tickcolor="black", ticklen=4,
         ),

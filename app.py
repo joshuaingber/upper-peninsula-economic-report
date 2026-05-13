@@ -279,12 +279,18 @@ def _secondary_row_html(secondary: dict) -> str:
     else:
         unr_value, unr_delta, unr_period = "—", "", '<div class="kpi-period">(unavailable)</div>'
 
-    # Net migration cell: signed integer + tax year (NO arrow — sign IS the headline)
+    # Net migration cell: signed integer + two-year flow label
+    # (NO arrow — sign IS the headline). Label calls out the two-year window
+    # explicitly and discloses that IRS SOI excludes international flows.
     if irs:
         sign = "+" if irs["net_exemptions"] >= 0 else "−"
         irs_value = f"{sign}{abs(irs['net_exemptions']):,}"
         irs_delta = ""  # no arrow on migration
-        irs_period = f'<div class="kpi-period">({irs["tax_year"]} tax year)</div>'
+        irs_period = (
+            f'<div class="kpi-period">'
+            f'({irs["origin_year"]}→{irs["dest_year"]} filings, domestic only)'
+            f'</div>'
+        )
     else:
         irs_value, irs_delta, irs_period = "—", "", '<div class="kpi-period">(unavailable)</div>'
 
@@ -316,6 +322,13 @@ for col, county_name in zip(cols, county_order):
         county_df = df[df["county_name"] == county_name]
         color = COUNTY_COLORS.get(county_name, FAU_BLUE)
         _county_snapshot_card(county_df, county_name, color, _secondary_for(county_name))
+
+st.caption(
+    "Net Migration reflects IRS SOI domestic county-to-county filings only "
+    "(excludes international migration, which is a major component of Florida "
+    "population growth). FRED real GDP and unemployment rate vintages reflect "
+    "the most recent BEA/BLS releases as of the data badge above."
+)
 
 # ── County Tabs ───────────────────────────────────────────────────────────────
 

@@ -107,6 +107,12 @@ h1, h2, h3, h4 { color: """ + FAU_BLUE + """; }
     border-top: 1px solid """ + FAU_GRAY + """;
 }
 .kpi-period { font-size: 0.7rem; color: #888; margin-top: 0.15rem; }
+.kpi-caption {
+    font-size: 0.78rem;
+    color: #888;
+    margin: -0.5rem 0 1.5rem 0;
+    line-height: 1.3;
+}
 
 /* Tabs */
 .tab-bar { display: flex; border-bottom: 2px solid """ + FAU_GRAY + """; margin: 1.5rem 0 0 0; }
@@ -246,7 +252,11 @@ def _secondary_row_html(secondary):
         sign = "+" if irs["net_exemptions"] >= 0 else "−"
         irs_value = f"{sign}{abs(irs['net_exemptions']):,}"
         irs_delta = ""  # no arrow on migration — sign is the headline
-        irs_period = f'<div class="kpi-period">({irs["tax_year"]} tax year)</div>'
+        irs_period = (
+            f'<div class="kpi-period">'
+            f'({irs["origin_year"]}→{irs["dest_year"]} filings, domestic only)'
+            f'</div>'
+        )
     else:
         irs_value, irs_delta, irs_period = "—", "", '<div class="kpi-period">(unavailable)</div>'
 
@@ -623,6 +633,12 @@ def build_html(df):
         "</header>",
         f'<h3 style="color: {FAU_BLUE};">Regional Snapshot</h3>',
         f'<div class="snapshot-row">{kpi_cards}</div>',
+        '<p class="kpi-caption">'
+        'Net Migration reflects IRS SOI domestic county-to-county filings only '
+        '(excludes international migration, which is a major component of Florida '
+        'population growth). FRED real GDP and unemployment rate vintages reflect '
+        'the most recent BEA/BLS releases as of the data badge above.'
+        '</p>',
         '<div class="divider"></div>',
         f'<div class="tab-bar">{tab_buttons}</div>',
         tab_content,

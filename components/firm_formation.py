@@ -10,24 +10,26 @@ from __future__ import annotations
 import plotly.graph_objects as go
 import pandas as pd
 
-from data.clean import get_firm_formation_data, get_national_qoq_pct, get_total_covered
-from data.constants import FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_SAND
+from data.clean import get_firm_formation_data, get_national_qoq_pct
+from data.constants import (
+    FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_SAND, AGGLVL_TOTAL_BY_OWN,
+)
 from data.fetch import fetch_national_data
 from utils.narratives import source_citation
 
 
 METHODOLOGY_NOTE = (
-    "Quarterly aggregation of industry-level changes in establishment counts. "
-    "Each quarter's blue bar sums the establishment growth across industries "
-    "that gained firms; the red bar sums the loss across industries that shed "
-    "firms; the net is the county-wide QoQ change in establishment count. This "
-    "is not true gross firm openings and closings — BLS does not publish those "
-    "at the county level — but it captures industry-level establishment churn. "
-    "The dashed gold line shows what the county's net change would be if it grew "
-    "at the U.S. average rate this quarter (national QCEW QoQ growth rescaled to "
-    "the county's establishment base). Trailing quarters with no benchmark mean "
-    "the national figure hasn't been published yet. Q1 typically shows a large "
-    "negative pattern across counties due to year-end reporting cycles in QCEW."
+    "Each blue bar sums the QoQ establishment growth across industries that "
+    "gained firms; the red bar sums the loss across industries that shed firms. "
+    "The dark line shows the county's BLS-published private establishment net "
+    "change (own_code=5, agglvl=71) — it does not equal the sum of the bars "
+    "because BLS suppresses small-cell industries from the per-sector view. The "
+    "dashed gold benchmark is U.S. private-sector QoQ growth rescaled to the "
+    "county's private establishment base — like-for-like with the bars. "
+    "Trailing quarters with no benchmark mean the national figure hasn't been "
+    "published yet. Q1 typically shows a large negative pattern across counties "
+    "due to year-end reporting cycles in QCEW. This is not true gross firm "
+    "openings and closings — BLS does not publish those at the county level."
 )
 
 
@@ -54,11 +56,11 @@ def build_figure(
     fig.add_trace(go.Scatter(
         x=x, y=plot_data["net"],
         mode="lines+markers",
-        name="Net change",
+        name="County net (BLS-published, private)",
         line=dict(color=FAU_DARK_GRAY, width=2),
         marker=dict(size=5, color=FAU_DARK_GRAY,
                     line=dict(width=1, color="white")),
-        hovertemplate="%{x}<br>Net: %{y:+,.0f} establishments<extra></extra>",
+        hovertemplate="%{x}<br>County net: %{y:+,.0f} establishments<extra></extra>",
     ))
 
     # Optional national benchmark trace: U.S. QoQ pct rescaled to county scale.
@@ -112,13 +114,23 @@ def build_figure(
 
 
 def _load_national_benchmark(df: pd.DataFrame):
-    """Returns (national_pct, county_prev_estabs) or (None, None) if anything fails."""
+    """Returns (national_pct, county_prev_estabs) on a private-only basis.
+
+    Both sides are own_code=5 (private) so the benchmark line is apples-to-
+    apples with the industry bars. Falls back to (None, None) on any failure.
+    """
     try:
-        national_pct = get_national_qoq_pct(fetch_national_data())
+        national_pct = get_national_qoq_pct(fetch_national_data(), own_code=5)
         if national_pct.empty:
             return None, None
+        # County-private total: own_code=5, agglvl=71 (single row per quarter)
+        county_private = df[
+            (df["own_code"] == 5) & (df["agglvl_code"] == AGGLVL_TOTAL_BY_OWN)
+        ]
+        if county_private.empty:
+            return None, None
         county_estabs = (
-            get_total_covered(df).set_index("date")["qtrly_estabs"].sort_index()
+            county_private.set_index("date")["qtrly_estabs"].sort_index()
         )
         county_prev_estabs = county_estabs.shift(1)
         return national_pct, county_prev_estabs

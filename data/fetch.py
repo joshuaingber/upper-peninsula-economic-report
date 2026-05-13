@@ -16,7 +16,10 @@ try:
 except ImportError:
     st = None
 
-from data.constants import BLS_BASE_URL, COUNTIES, YEARS, QUARTERS, AGGLVL_US_TOTAL
+from data.constants import (
+    BLS_BASE_URL, COUNTIES, YEARS, QUARTERS,
+    AGGLVL_US_TOTAL, AGGLVL_US_BY_OWN,
+)
 
 CACHE_DIR = Path(__file__).parent / "cache"
 CACHE_FILE = CACHE_DIR / "qcew_data.parquet"
@@ -121,8 +124,11 @@ def refresh_data() -> pd.DataFrame:
 def _fetch_national_from_bls() -> pd.DataFrame:
     """Fetch US000 (national totals) for each year/quarter.
 
-    Returns RAW BLS columns filtered to (own_code=0, agglvl_code=AGGLVL_US_TOTAL),
-    which yields exactly one row per quarter (empirically verified for 2024 Q1).
+    Returns RAW BLS columns filtered to two ownership slices per quarter:
+      - (own_code=0, agglvl=AGGLVL_US_TOTAL=10) — all-ownership total covered
+      - (own_code=5, agglvl=AGGLVL_US_BY_OWN=11) — private only
+    The private slice powers the firm-formation benchmark so it is apples-
+    to-apples with the county's private-only industry data.
 
     Do NOT pass this through clean() — clean() requires the `county_name`
     column added by the per-county fetcher.
@@ -148,7 +154,10 @@ def _fetch_national_from_bls() -> pd.DataFrame:
                 resp = requests.get(url, timeout=60)  # larger timeout — file is bigger
                 if resp.status_code == 200:
                     df = pd.read_csv(io.StringIO(resp.text))
-                    df = df[(df["own_code"] == 0) & (df["agglvl_code"] == AGGLVL_US_TOTAL)]
+                    df = df[
+                        ((df["own_code"] == 0) & (df["agglvl_code"] == AGGLVL_US_TOTAL))
+                        | ((df["own_code"] == 5) & (df["agglvl_code"] == AGGLVL_US_BY_OWN))
+                    ]
                     frames.append(df)
             except Exception:
                 pass
@@ -170,11 +179,25 @@ def _fetch_national_from_bls() -> pd.DataFrame:
 def fetch_national_data() -> pd.DataFrame:
     """Load national QCEW totals from cache, or fetch from BLS if no cache exists.
 
-    Returns raw BLS columns (NOT cleaned). Use data.clean.get_national_qoq_pct
-    to derive the QoQ percent change series.
+    Returns raw BLS columns (NOT cleaned) for two ownership slices:
+    (own_code=0, agglvl=10) — total covered — and (own_code=5, agglvl=11)
+    — private. The private slice powers the firm-formation benchmark.
+    Use data.clean.get_national_qoq_pct(df, own_code=...) to derive the
+    QoQ percent change series for either slice.
+
+    Self-migrates: if a pre-existing cache predates the multi-ownership
+    filter (only own_code=0 present), the cache is re-fetched in place
+    so consumers downstream don't silently degrade on a stale schema.
     """
     if NATIONAL_CACHE_FILE.exists():
-        return pd.read_parquet(NATIONAL_CACHE_FILE)
+        df = pd.read_parquet(NATIONAL_CACHE_FILE)
+        if "own_code" in df.columns and 5 not in df["own_code"].values:
+            fresh = _fetch_national_from_bls()
+            if not fresh.empty:
+                CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                fresh.to_parquet(NATIONAL_CACHE_FILE, index=False)
+                df = fresh
+        return df
     df = _fetch_national_from_bls()
     if not df.empty:
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
