@@ -190,6 +190,148 @@ Object.keys(figureData).forEach(function(divId) {
 });
 """
 
+# ── Embed CSS / JS (used by wrap_as_embed) ───────────────────────────────────
+# Trimmed copy of CSS — drops .tab-*, .main-title, .main-subtitle, .data-badge,
+# .footer (none of which appear in embed pages). body { max-width:none } so the
+# embed fills the iframe width rather than the desktop 1200px cap. Includes a
+# media query so the KPI embed stacks its 3 county cards vertically below 768px.
+
+EMBED_CSS = """
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background-color: #FFFFFF;
+    color: """ + FAU_DARK_GRAY + """;
+    line-height: 1.6;
+    padding: 0.5rem;
+}
+
+h1, h2, h3, h4 { color: """ + FAU_BLUE + """; }
+
+/* KPI cards */
+.snapshot-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+.county-card {
+    flex: 1;
+    background: linear-gradient(135deg, #F8F9FA 0%, #FFFFFF 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border-left: 5px solid;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.county-card h3 { margin: 0 0 0.8rem 0; font-size: 1.3rem; }
+.kpi-row { display: flex; justify-content: space-between; gap: 0.8rem; }
+.kpi-item { flex: 1; text-align: center; }
+.kpi-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.2rem;
+    color: """ + FAU_DARK_GRAY + """;
+    min-height: 1.8rem;
+    line-height: 0.9rem;
+}
+.kpi-value { font-size: 1.4rem; font-weight: 700; color: """ + FAU_BLUE + """; }
+.kpi-delta { font-size: 0.8rem; margin-top: 0.1rem; }
+.kpi-delta.positive { color: #2E7D32; }
+.kpi-delta.negative { color: """ + FAU_RED + """; }
+.kpi-row.secondary {
+    margin-top: 0.9rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid """ + FAU_GRAY + """;
+}
+.kpi-period { font-size: 0.7rem; color: #888; margin-top: 0.15rem; }
+.kpi-caption {
+    font-size: 0.78rem;
+    color: #888;
+    margin: 0.75rem 0 0 0;
+    line-height: 1.3;
+}
+
+/* Chart sections */
+.section { margin: 0; }
+.section h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.section p { margin-bottom: 0.75rem; }
+
+.chart-row { display: flex; gap: 1rem; }
+.chart-col { flex: 1; min-width: 0; }
+
+.source {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.25rem;
+}
+.source a { color: """ + FAU_ELECTRIC_BLUE + """; text-decoration: none; }
+.source a:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+    .snapshot-row, .chart-row { flex-direction: column; }
+    body { padding: 0.3rem; }
+}
+"""
+
+# Each embed posts its rendered height to the parent FAU page via postMessage.
+# Debounce (100 ms) + last-height dedupe kill the feedback loop where Plotly's
+# responsive: true would re-fire layout when the parent resizes the iframe.
+EMBED_JS = """
+Object.keys(figureData).forEach(function(divId) {
+    var fig = figureData[divId];
+    Plotly.newPlot(divId, fig.data, fig.layout, {responsive: true});
+});
+
+(function() {
+  var lastHeight = 0, timer;
+  function postHeight() {
+    clearTimeout(timer);
+    timer = setTimeout(function() {
+      var h = document.documentElement.scrollHeight;
+      if (h === lastHeight) return;
+      lastHeight = h;
+      window.parent.postMessage({type: 'sfer-resize', height: h}, '*');
+    }, 100);
+  }
+  window.addEventListener('load', postHeight);
+  window.addEventListener('resize', postHeight);
+  setTimeout(postHeight, 800);
+  document.querySelectorAll('.plotly-chart').forEach(function(el) {
+    el.on && el.on('plotly_afterplot', postHeight);
+  });
+})();
+"""
+
+
+def wrap_as_embed(body_html: str, figures: dict, page_title: str) -> str:
+    """Wrap a body HTML fragment into a self-contained embed page.
+
+    Each embed is a standalone HTML document: loads Plotly from CDN, bundles
+    the trimmed embed CSS, renders the included figures, and posts its content
+    height to the parent via postMessage. CSS isolation is automatic — iframes
+    have their own document, so styles cannot collide with the host page.
+    """
+    figures_json = json.dumps(figures)
+    return "\n".join([
+        "<!DOCTYPE html>",
+        '<html lang="en">',
+        "<head>",
+        '<meta charset="UTF-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+        f"<title>{page_title}</title>",
+        '<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>',
+        "<style>",
+        EMBED_CSS,
+        "</style>",
+        "</head>",
+        "<body>",
+        body_html,
+        "<script>",
+        f"var figureData = {figures_json};",
+        EMBED_JS,
+        "</script>",
+        "</body>",
+        "</html>",
+    ])
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 SOURCE = '<p class="source">Source: <a href="https://www.bls.gov/cew/">BLS QCEW</a> — Quarterly</p>'
@@ -383,11 +525,16 @@ def _trends_chart(totals, y_col, title, color, tickformat, hover_prefix, log_tra
     return fig
 
 
-def build_trends(county_df, county_name, county_id, figures):
-    """Employment & Salary Trends — raw + STL-trend overlays, side by side."""
+def build_trends(county_df, county_name, county_id):
+    """Employment & Salary Trends — raw + STL-trend overlays, side by side.
+
+    Returns (html_fragment, figures_dict) so the caller can either merge the
+    figures into the main dashboard's master dict (index.html path) or write
+    the fragment as a standalone embed page.
+    """
     totals = get_total_covered(county_df)
     if totals.empty:
-        return '<div class="section"><h2>Employment &amp; Salary Trends</h2><p>No trend data available.</p></div>'
+        return '<div class="section"><h2>Employment &amp; Salary Trends</h2><p>No trend data available.</p></div>', {}
 
     totals = totals.sort_values("date")
     earliest, latest = totals.iloc[0], totals.iloc[-1]
@@ -411,9 +558,9 @@ def build_trends(county_df, county_name, county_id, figures):
     fig_w = _trends_chart(totals, "avg_annual_wage", "Average Salary", color, "$,.0f", "$", log_transform=True)
 
     eid, wid = f"{county_id}-trends-empl", f"{county_id}-trends-wage"
-    figures[eid], figures[wid] = _fig_json(fig_e), _fig_json(fig_w)
+    figures = {eid: _fig_json(fig_e), wid: _fig_json(fig_w)}
 
-    return (
+    html = (
         f'<div class="section"><h2>Employment &amp; Salary Trends</h2>'
         f'<p>{narrative}</p>'
         f'<div class="chart-row">'
@@ -421,13 +568,14 @@ def build_trends(county_df, county_name, county_id, figures):
         f'<div class="chart-col"><div id="{wid}" class="plotly-chart"></div></div>'
         f'</div>{SOURCE}{TRENDS_NOTE}</div>'
     )
+    return html, figures
 
 
-def build_growth_quadrant(county_df, county_name, county_id, figures):
+def build_growth_quadrant(county_df, county_name, county_id):
     """Growth Quadrant — YoY employment vs salary growth, domain-colored bubbles."""
     plot_data = get_growth_quadrant_data(county_df)
     if plot_data.empty:
-        return '<div class="section"><h2>Industry Landscape</h2><p>No disclosable industry growth data.</p></div>'
+        return '<div class="section"><h2>Industry Landscape</h2><p>No disclosable industry growth data.</p></div>', {}
 
     year, qtr = int(plot_data["year"].iloc[0]), int(plot_data["qtr"].iloc[0])
 
@@ -450,13 +598,14 @@ def build_growth_quadrant(county_df, county_name, county_id, figures):
 
     fig = build_growth_quadrant_fig(plot_data)
     div_id = f"{county_id}-growth-quadrant"
-    figures[div_id] = _fig_json(fig)
+    figures = {div_id: _fig_json(fig)}
 
-    return (
+    html = (
         f'<div class="section"><h2>Industry Landscape</h2>'
         f'<p>{narrative}</p>'
         f'<div id="{div_id}" class="plotly-chart"></div>{SOURCE}{GROWTH_QUADRANT_NOTE}</div>'
     )
+    return html, figures
 
 
 from components.firm_formation import METHODOLOGY_NOTE as _FIRM_FORMATION_TEXT
@@ -466,7 +615,7 @@ from components.employment_treemap import METHODOLOGY_NOTE as _EMPLOYMENT_TREEMA
 EMPLOYMENT_TREEMAP_NOTE = f'<p class="source"><em>{_EMPLOYMENT_TREEMAP_TEXT}</em></p>'
 
 
-def build_firm_formation(county_df, county_name, county_id, figures):
+def build_firm_formation(county_df, county_name, county_id):
     """Firm Openings & Closings — quarterly establishment churn (industry-level decomposition)."""
     from components.firm_formation import build_figure as firm_formation_fig
     from data.clean import get_firm_formation_data, get_national_qoq_pct
@@ -474,7 +623,7 @@ def build_firm_formation(county_df, county_name, county_id, figures):
 
     plot_data = get_firm_formation_data(county_df)
     if plot_data.empty:
-        return '<div class="section"><h2>Firm Openings &amp; Closings</h2><p>Not enough establishment data to compute quarterly churn.</p></div>'
+        return '<div class="section"><h2>Firm Openings &amp; Closings</h2><p>Not enough establishment data to compute quarterly churn.</p></div>', {}
 
     # National benchmark — graceful fallback to 3-trace chart if the fetch fails.
     try:
@@ -502,25 +651,26 @@ def build_firm_formation(county_df, county_name, county_id, figures):
 
     fig = firm_formation_fig(plot_data, national_pct, county_prev_estabs)
     div_id = f"{county_id}-firm-formation"
-    figures[div_id] = _fig_json(fig)
+    figures = {div_id: _fig_json(fig)}
 
-    return (
+    html = (
         f'<div class="section"><h2>Firm Openings &amp; Closings</h2>'
         f'<p>{narrative}</p>'
         f'<div id="{div_id}" class="plotly-chart"></div>{SOURCE}{FIRM_FORMATION_NOTE}</div>'
     )
+    return html, figures
 
 
 # ── HTML Assembly ────────────────────────────────────────────────────────────
 
-def build_employment_treemap(county_df, county_name, county_id, figures):
+def build_employment_treemap(county_df, county_name, county_id):
     """Workforce Composition — multi-trace treemap with year-selector buttons."""
     from components.employment_treemap import build_figure as treemap_fig
     from data.clean import get_treemap_snapshots
 
     snapshots = get_treemap_snapshots(county_df)
     if not snapshots:
-        return '<div class="section"><h2>Workforce Composition</h2><p>No disclosable employment data.</p></div>'
+        return '<div class="section"><h2>Workforce Composition</h2><p>No disclosable employment data.</p></div>', {}
 
     year, qtr, latest = snapshots[-1]
     top3 = latest.head(3)
@@ -535,18 +685,23 @@ def build_employment_treemap(county_df, county_name, county_id, figures):
 
     fig = treemap_fig(snapshots)
     div_id = f"{county_id}-employment-treemap"
-    figures[div_id] = _fig_json(fig)
+    figures = {div_id: _fig_json(fig)}
 
-    return (
+    html = (
         f'<div class="section"><h2>Workforce Composition</h2>'
         f'<p>{narrative}</p>'
         f'<div id="{div_id}" class="plotly-chart"></div>{SOURCE}{EMPLOYMENT_TREEMAP_NOTE}</div>'
     )
+    return html, figures
 
 
+# (slug, builder) pairs — the slug is used as the embed filename under
+# docs/embeds/<county>/<slug>.html.
 SECTION_BUILDERS = [
-    build_trends, build_employment_treemap, build_growth_quadrant,
-    build_firm_formation,
+    ("trends", build_trends),
+    ("workforce-composition", build_employment_treemap),
+    ("industry-landscape", build_growth_quadrant),
+    ("firm-formation", build_firm_formation),
 ]
 
 
@@ -601,10 +756,12 @@ def build_html(df):
         )
 
         sections = []
-        for i, builder in enumerate(SECTION_BUILDERS):
+        for i, (_slug, builder) in enumerate(SECTION_BUILDERS):
             if i > 0:
                 sections.append('<div class="divider"></div>')
-            sections.append(builder(county_df, county_name, county_id, figures))
+            section_html, section_figs = builder(county_df, county_name, county_id)
+            sections.append(section_html)
+            figures.update(section_figs)
 
         tab_content += f'<div id="{county_id}" class="tab-content{active}">\n'
         tab_content += "\n".join(sections)
@@ -635,13 +792,7 @@ def build_html(df):
         "</header>",
         f'<h3 style="color: {FAU_BLUE};">Regional Snapshot</h3>',
         f'<div class="snapshot-row">{kpi_cards}</div>',
-        '<p class="kpi-caption">'
-        'Net Migration reflects IRS SOI county-to-county filings (Total Migration-US '
-        'and Foreign) — the net change in tax-filer exemptions between consecutive '
-        'filing years, inclusive of moves into and out of the country. FRED real GDP '
-        'and unemployment rate vintages reflect the most recent BEA/BLS releases as '
-        'of the data badge above.'
-        '</p>',
+        KPI_CAPTION_HTML,
         '<div class="divider"></div>',
         f'<div class="tab-bar">{tab_buttons}</div>',
         tab_content,
@@ -656,6 +807,83 @@ def build_html(df):
         "</body>",
         "</html>",
     ])
+
+
+# ── Embed pipeline ───────────────────────────────────────────────────────────
+
+KPI_CAPTION_HTML = (
+    '<p class="kpi-caption">'
+    'Net Migration reflects IRS SOI county-to-county filings (Total Migration-US '
+    'and Foreign) — the net change in tax-filer exemptions between consecutive '
+    'filing years, inclusive of moves into and out of the country. FRED real GDP '
+    'and unemployment rate vintages reflect the most recent BEA/BLS releases as '
+    'of the data badge above.'
+    '</p>'
+)
+
+
+def write_embeds(df):
+    """Emit one standalone embed page per chart, plus one for the KPI row.
+
+    File layout:
+        docs/embeds/kpi-cards.html
+        docs/embeds/<county-slug>/<section-slug>.html  (4 per county × 3 counties)
+
+    Each output is a self-contained HTML page wrapping the same fragments
+    used by the main dashboard — so visuals stay identical and the Monday
+    GitHub Action regenerates them on the same cadence as docs/index.html.
+    """
+    from data.fetch_fred import fetch_real_gdp, fetch_unemployment_rate
+    from data.fetch_irs_migration import fetch_irs_migration
+    from data.clean import (
+        latest_gdp_with_growth, latest_unrate_with_yoy, latest_irs_net,
+    )
+
+    embeds_dir = DOCS_DIR / "embeds"
+    embeds_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── KPI embed: 3 county cards + disclosure caption (no Plotly figures). ──
+    df_gdp = fetch_real_gdp()
+    df_unrate = fetch_unemployment_rate()
+    df_irs = fetch_irs_migration()
+
+    kpi_cards = ""
+    for county_name in COUNTY_ORDER:
+        county_df = df[df["county_name"] == county_name]
+        color = COUNTY_COLORS.get(county_name, FAU_BLUE)
+        secondary = {
+            "gdp": latest_gdp_with_growth(df_gdp, county_name),
+            "unrate": latest_unrate_with_yoy(df_unrate, county_name),
+            "irs": latest_irs_net(df_irs, county_name),
+        }
+        kpi_cards += build_kpi_card(county_df, county_name, color, secondary)
+
+    kpi_body = (
+        f'<h3 style="color: {FAU_BLUE}; margin-bottom: 0.5rem;">Regional Snapshot</h3>'
+        f'<div class="snapshot-row">{kpi_cards}</div>'
+        f'{KPI_CAPTION_HTML}'
+    )
+    (embeds_dir / "kpi-cards.html").write_text(
+        wrap_as_embed(kpi_body, {}, "South Florida Regional Snapshot"),
+        encoding="utf-8",
+    )
+
+    # ── Per-county chart embeds: 4 sections × 3 counties = 12 files. ─────────
+    for county_name in COUNTY_ORDER:
+        county_df = df[df["county_name"] == county_name]
+        county_id = county_name.lower().replace(" ", "-")
+        county_dir = embeds_dir / county_id
+        county_dir.mkdir(parents=True, exist_ok=True)
+
+        for slug, builder in SECTION_BUILDERS:
+            section_html, section_figs = builder(county_df, county_name, county_id)
+            title = f"{county_name} County — {slug.replace('-', ' ').title()}"
+            (county_dir / f"{slug}.html").write_text(
+                wrap_as_embed(section_html, section_figs, title),
+                encoding="utf-8",
+            )
+
+    print(f"  Wrote 1 KPI embed + {len(COUNTY_ORDER) * len(SECTION_BUILDERS)} chart embeds to {embeds_dir}")
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
@@ -677,3 +905,6 @@ if __name__ == "__main__":
     output = DOCS_DIR / "index.html"
     output.write_text(html, encoding="utf-8")
     print(f"Done! {output} ({output.stat().st_size / 1024:.0f} KB)")
+
+    print("Building embed pages...")
+    write_embeds(df)

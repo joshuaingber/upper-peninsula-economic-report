@@ -33,4 +33,6 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: 'Update dashboard data'
-          file_pattern: 'docs/*'
+          # Bare 'docs' (no glob) so git add recurses into docs/embeds/<county>/.
+          # The 'docs/*' glob would only match top-level files and silently skip embeds.
+          file_pattern: docs
