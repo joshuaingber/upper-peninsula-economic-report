@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+title: "South Florida Regional Economic Report"
+message: "If you reference this dashboard, please cite it as below."
+type: software
+authors:
+  - family-names: Cutsinger
+    given-names: Bryan
+    email: bcutsinger@fau.edu
+    affiliation: "Florida Atlantic University"
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
+url: "https://github.com/bryanpcutsinger/south-florida-economic-report"
+repository-code: "https://github.com/bryanpcutsinger/south-florida-economic-report"
+keywords:
+  - economic indicators
+  - QCEW
+  - South Florida
+  - dashboard
+license: MIT
+version: "1.0.0"
+date-released: "2026-05-15"
