@@ -24,39 +24,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-build.txt
 
-      # TEMPORARY DIAGNOSTIC — prints only HTTP status codes (never the key) to
-      # distinguish a bad/revoked secret (401/403) from rate-limiting (429).
-      # Remove once the blank-GDP/unemployment issue is resolved.
-      - name: Diagnose FRED reachability
-        continue-on-error: true
-        env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: |
-          python3 - <<'PY'
-          import os, requests
-          from data.constants import FRED_GDP_SERIES, FRED_UNRATE_SERIES
-          key = os.environ.get("FRED_API_KEY", "")
-          print(f"key_present={bool(key)} key_len={len(key)}")
-          for label, m in [("GDP", FRED_GDP_SERIES), ("UNRATE", FRED_UNRATE_SERIES)]:
-              for county, sid in m.items():
-                  try:
-                      r = requests.get(
-                          "https://api.stlouisfed.org/fred/series/observations",
-                          params={"series_id": sid, "api_key": key, "file_type": "json"},
-                          timeout=15,
-                      )
-                      try:
-                          j = r.json()
-                      except Exception:
-                          j = {}
-                      n = len(j.get("observations", []))
-                      # error_message is safe to print — FRED does not echo the key in it
-                      err = j.get("error_message", "")
-                      print(f"{label:6} {sid:16} status={r.status_code} n_obs={n} err={err!r}")
-                  except Exception as e:
-                      print(f"{label:6} {sid:16} EXC {type(e).__name__}: {e}")
-          PY
-
       - name: Build static dashboard
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import os
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -39,23 +40,59 @@ def _fred_observations(series_id: str, api_key: str) -> pd.DataFrame:
     return df.dropna(subset=["value"]).sort_values("date").reset_index(drop=True)
 
 
+# FRED enforces a burst rate limit (nominally 120 req/min, but it 429s much
+# tighter rapid bursts). We fetch only a handful of series, so a small fixed
+# gap between requests plus exponential backoff on a 429 keeps us under it.
+_INTER_REQUEST_GAP = 0.6   # seconds between consecutive series requests
+_MAX_ATTEMPTS = 5          # per-series tries before giving up
+_BACKOFF_BASE = 1.0        # seconds; doubles each retry
+
+
+def _fetch_one(series_id: str, api_key: str) -> pd.DataFrame:
+    """Fetch one series with retry + backoff, honoring 429 Retry-After.
+
+    Returns an empty DataFrame if every attempt fails. A 429 (rate limit) is
+    retried with exponential backoff; other HTTP/network errors get a short
+    backoff too, since they're usually transient.
+    """
+    delay = _BACKOFF_BASE
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            df = _fred_observations(series_id, api_key)
+            if not df.empty:
+                return df
+        except requests.HTTPError as exc:
+            resp = exc.response
+            if resp is not None and resp.status_code == 429:
+                # Respect server-provided Retry-After when present and numeric.
+                retry_after = (resp.headers.get("Retry-After") or "").strip()
+                wait = float(retry_after) if retry_after.isdigit() else delay
+            else:
+                wait = delay
+        except Exception:
+            wait = delay
+        else:
+            # Reached only when the call succeeded but returned no rows.
+            wait = delay
+        if attempt < _MAX_ATTEMPTS - 1:
+            time.sleep(wait)
+            delay *= 2
+    return pd.DataFrame()
+
+
 def _fetch_series_set(series_map: dict, api_key: str) -> pd.DataFrame:
     """Fetch all county series in long-format (county_name, date, value).
 
-    Each series is tried up to 2 times to absorb transient network blips.
-    Returns empty DataFrame if ANY county fails, so we never persist a
-    partial cache that would silently drop counties on subsequent loads.
+    Each series is retried with backoff (see _fetch_one), and consecutive
+    requests are spaced out to stay under FRED's burst rate limit. Returns an
+    empty DataFrame if ANY county fails, so we never persist a partial cache
+    that would silently drop counties on subsequent loads.
     """
     frames = []
-    for county, sid in series_map.items():
-        df = pd.DataFrame()
-        for attempt in range(2):
-            try:
-                df = _fred_observations(sid, api_key)
-                if not df.empty:
-                    break
-            except Exception:
-                df = pd.DataFrame()
+    for i, (county, sid) in enumerate(series_map.items()):
+        if i:
+            time.sleep(_INTER_REQUEST_GAP)
+        df = _fetch_one(sid, api_key)
         if df.empty:
             return pd.DataFrame()  # don't persist a partial set
         df["county_name"] = county
