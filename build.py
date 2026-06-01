@@ -915,6 +915,24 @@ if __name__ == "__main__":
     df = clean(raw)
     print(f"  {len(df):,} rows for {df['county_name'].nunique()} counties")
 
+    # Guard the secondary KPI row. When a FRED key IS configured, an empty GDP
+    # or unemployment fetch means a real failure (e.g. a 429 rate limit), not an
+    # intentional keyless run — so abort BEFORE writing any files. The Action's
+    # commit step is skipped on a failed build, leaving last week's good values
+    # published instead of overwriting them with "(unavailable)". With no key
+    # set (local/no-key runs), skip the guard and let the row degrade to "—".
+    # The fetches cache on success, so build_html/write_embeds reuse these.
+    from data.fetch_fred import _fred_api_key, fetch_real_gdp, fetch_unemployment_rate
+    if _fred_api_key():
+        if fetch_real_gdp().empty or fetch_unemployment_rate().empty:
+            print(
+                "ERROR: FRED_API_KEY is set but the GDP/unemployment fetch "
+                "returned no data (likely rate-limited or a FRED outage). "
+                "Aborting without writing so the currently published KPI "
+                "values are preserved rather than blanked."
+            )
+            sys.exit(1)
+
     print("Building HTML dashboard...")
     html = build_html(df)
 
