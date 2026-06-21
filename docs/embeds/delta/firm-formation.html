@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delta County — Firm Formation</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background-color: #FFFFFF;
+    color: #3D3D3D;
+    line-height: 1.6;
+    padding: 0.5rem;
+}
+
+h1, h2, h3, h4 { color: #095339; }
+
+/* KPI cards */
+.snapshot-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+.snapshot-row.single-county { display: block; max-width: 480px; margin: 0 auto 1rem; }
+.county-card {
+    flex: 1;
+    background: linear-gradient(135deg, #F8F9FA 0%, #FFFFFF 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border-left: 5px solid;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.county-card h3 { margin: 0 0 0.8rem 0; font-size: 1.3rem; }
+.kpi-row { display: flex; justify-content: space-between; gap: 0.8rem; }
+.kpi-item { flex: 1; text-align: center; }
+.kpi-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.2rem;
+    color: #3D3D3D;
+    min-height: 1.8rem;
+    line-height: 0.9rem;
+}
+.kpi-value { font-size: 1.4rem; font-weight: 700; color: #095339; }
+.kpi-delta { font-size: 0.8rem; margin-top: 0.1rem; }
+.kpi-delta.positive { color: #2E7D32; }
+.kpi-delta.negative { color: #C8102E; }
+.kpi-row.secondary {
+    margin-top: 0.9rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid #CCCCCC;
+}
+.kpi-period { font-size: 0.7rem; color: #888; margin-top: 0.15rem; }
+.kpi-caption {
+    font-size: 0.78rem;
+    color: #888;
+    margin: 0.75rem 0 0 0;
+    line-height: 1.3;
+}
+
+/* Chart sections */
+.section { margin: 0; }
+.section h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.section p { margin-bottom: 0.75rem; }
+
+.chart-row { display: flex; gap: 1rem; }
+.chart-col { flex: 1; min-width: 0; }
+
+.source {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.25rem;
+}
+.source a { color: #FFC425; text-decoration: none; }
+.source a:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+    .snapshot-row, .chart-row { flex-direction: column; }
+    body { padding: 0.3rem; }
+}
+
+</style>
+</head>
+<body>
+<div class="section"><h2>Firm Openings &amp; Closings</h2><p>In the most recent quarter (2025 Q4), the county's establishment count contracted by 5 firms — the net of 9 added across growing industries and 7 lost across shrinking ones.</p><div id="delta-firm-formation" class="plotly-chart"></div><p class="source">Source: <a href="https://www.bls.gov/cew/">BLS QCEW</a> — Quarterly</p><p class="source"><em>Each blue bar sums the QoQ establishment growth across industries that gained firms; the red bar sums the loss across industries that shed firms. The dark line shows the county's BLS-published private establishment net change (own_code=5, agglvl=71) — it does not equal the sum of the bars because BLS suppresses small-cell industries from the per-sector view. The dashed gold benchmark is U.S. private-sector QoQ growth rescaled to the county's private establishment base — like-for-like with the bars. Trailing quarters with no benchmark mean the national figure hasn't been published yet. Q1 typically shows a large negative pattern across counties due to year-end reporting cycles in QCEW. This is not true gross firm openings and closings — BLS does not publish those at the county level.</em></p></div>
+<script>
+var figureData = {"delta-firm-formation": {"data": [{"hovertemplate": "%{x}<br>Adding: +%{y:,.0f} establishments<extra></extra>", "marker": {"color": "#095339"}, "name": "Industries adding establishments", "x": ["2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3", "2025 Q4"], "y": {"dtype": "f8", "bdata": "AAAAAACAREAAAAAAAAAkQAAAAAAAAAhAAAAAAAAAKkAAAAAAAAAgQAAAAAAAABBAAAAAAAAAFEAAAAAAAAAwQAAAAAAAACJAAAAAAAAAKEAAAAAAAAAQQAAAAAAAABBAAAAAAAAAPEAAAAAAAAAqQAAAAAAAABhAAAAAAAAAMkAAAAAAAAAwQAAAAAAAACBAAAAAAAAAMUAAAAAAAAAAAAAAAAAAACpAAAAAAAAAJEAAAAAAAAAUQAAAAAAAADBAAAAAAAAAJEAAAAAAAAAsQAAAAAAAACJA"}, "type": "bar"}, {"hovertemplate": "%{x}<br>Losing: %{y:,.0f} establishments<extra></extra>", "marker": {"color": "#C8102E"}, "name": "Industries losing establishments", "x": ["2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3", "2025 Q4"], "y": {"dtype": "f8", "bdata": "AAAAAAAAAMAAAAAAAAAAwAAAAAAAAC7AAAAAAAAAKMAAAAAAAAAowAAAAAAAACjAAAAAAAAAHMAAAAAAAAAUwAAAAAAAAADAAAAAAAAAEMAAAAAAAAAUwAAAAAAAACjAAAAAAAAA8L8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAIBbwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYwAAAAAAAAAjAAAAAAAAAAMAAAAAAAAAAAAAAAAAAABzA"}, "type": "bar"}, {"hovertemplate": "%{x}<br>County net: %{y:+,.0f} establishments<extra></extra>", "line": {"color": "#3D3D3D", "width": 2}, "marker": {"color": "#3D3D3D", "line": {"color": "white", "width": 1}, "size": 5}, "mode": "lines+markers", "name": "County net (BLS-published, private)", "x": ["2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3", "2025 Q4"], "y": {"dtype": "f8", "bdata": "AAAAAAAASkAAAAAAAAAmQAAAAAAAACbAAAAAAAAAAAAAAAAAAAAUwAAAAAAAACLAAAAAAAAAEMAAAAAAAAAqQAAAAAAAABhAAAAAAAAAIEAAAAAAAAAIwAAAAAAAAPC/AAAAAAAAO0AAAAAAAAAoQAAAAAAAACBAAAAAAAAANUAAAAAAAAAyQAAAAAAAABhAAAAAAAAAJkAAAAAAAEBfwAAAAAAAACpAAAAAAAAAIkAAAAAAAADwPwAAAAAAADFAAAAAAAAAJEAAAAAAAAAoQAAAAAAAABTA"}, "type": "scatter"}, {"connectgaps": false, "customdata": {"dtype": "f8", "bdata": "AC0R2C2FgT8A1OfgIEGBP4BLZVKJNYI/AHxM+B4CTL8AaFtkHL1mP4Bum7j6v4o/gGX4C1JNkj+A9bKiNoVwv4Bif6qBYI8/gAskoF/qkD+AtEc4dDySP4BTZL/b0oE/gEhBWwjYjz+Aig3+Z2KNP4Bwy4WYOYs/AGi11//PTz8AEL9soaxaPwBOmL8n5YQ/gF6FSV2dgj8At5gh07aBv4AjmPtI/4M/AKY0cjgJfD+AgSVRI4yAP4DeEEVvdoS/ACrgTpfyfj+ABBY+TwKFPwCkyIXF24c/"}, "hovertemplate": "%{x}<br>U.S. avg rate: %{customdata:+.2%}<br>At county scale: %{y:+,.0f} establishments<extra></extra>", "line": {"color": "#D4B98B", "dash": "dash", "width": 2}, "marker": {"color": "#D4B98B", "size": 5}, "mode": "lines+markers", "name": "U.S. avg rate (rescaled)", "x": ["2019 Q2", "2019 Q3", "2019 Q4", "2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3", "2025 Q4"], "y": {"dtype": "f8", "bdata": "erCySygGIUADCfVdV6QhQIKooWFQ0CJAyTNgKiuj7L9wjLUOi0UHQPEp2qBaOCtAZFSTBIB2MkAzVf4m3ZkQwLuf/vGz7S9AxePk3d1PMUAk8gnaV84yQN3qj3gUVCJAvgjgSnhbMECwxPITcfYuQByAjECdAS1Ar/hg6j0S8T+A+fCO0Cz9P6/CbKyqOCdAk/8iOM7LJEBpACWk9vojwLWHEelHHSRAFCBTPmSOHEAKiF1I+P8gQJZU9E+sBSXA7MGLOmAnIEC9Ldxr7h0mQJIS6MBvZSlA"}, "type": "scatter"}], "layout": {"template": {"data": {"candlestick": [{"decreasing": {"line": {"color": "#000033"}}, "increasing": {"line": {"color": "#000032"}}, "type": "candlestick"}], "contourcarpet": [{"colorscale": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]], "type": "contourcarpet"}], "contour": [{"colorscale": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]], "type": "contour"}], "heatmap": [{"colorscale": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]], "type": "heatmap"}], "histogram2d": [{"colorscale": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]], "type": "histogram2d"}], "icicle": [{"textfont": {"color": "white"}, "type": "icicle"}], "sankey": [{"textfont": {"color": "#000036"}, "type": "sankey"}], "scatter": [{"marker": {"line": {"width": 0}}, "type": "scatter"}], "table": [{"cells": {"fill": {"color": "#000038"}, "font": {"color": "#000037"}, "line": {"color": "#000039"}}, "header": {"fill": {"color": "#000040"}, "font": {"color": "#000036"}, "line": {"color": "#000039"}}, "type": "table"}], "waterfall": [{"connector": {"line": {"color": "#000036", "width": 2}}, "decreasing": {"marker": {"color": "#000033"}}, "increasing": {"marker": {"color": "#000032"}}, "totals": {"marker": {"color": "#000034"}}, "type": "waterfall"}]}, "layout": {"coloraxis": {"colorscale": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]]}, "colorscale": {"diverging": [[0.0, "#000021"], [0.1, "#000022"], [0.2, "#000023"], [0.3, "#000024"], [0.4, "#000025"], [0.5, "#000026"], [0.6, "#000027"], [0.7, "#000028"], [0.8, "#000029"], [0.9, "#000030"], [1.0, "#000031"]], "sequential": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]], "sequentialminus": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]]}, "colorway": ["#000001", "#000002", "#000003", "#000004", "#000005", "#000006", "#000007", "#000008", "#000009", "#000010"]}}, "shapes": [{"line": {"color": "black", "width": 1}, "type": "line", "x0": 0, "x1": 1, "xref": "x domain", "y0": 0, "y1": 0, "yref": "y"}], "margin": {"t": 40, "b": 210, "l": 70, "r": 20}, "legend": {"orientation": "h", "yanchor": "top", "y": -0.55, "x": 0}, "xaxis": {"title": {"text": "Quarter", "standoff": 20}, "automargin": true, "showgrid": false, "showline": true, "linecolor": "black", "linewidth": 2, "mirror": false, "ticks": "outside", "tickcolor": "black", "ticklen": 4, "tickangle": -45}, "yaxis": {"title": {"text": "Quarterly change in establishments"}, "showgrid": false, "showline": true, "linecolor": "black", "linewidth": 2, "mirror": false, "ticks": "outside", "tickcolor": "black", "ticklen": 4, "tickformat": "+,.0f", "zeroline": false}, "plot_bgcolor": "white", "paper_bgcolor": "white", "height": 460, "barmode": "relative", "hovermode": "x unified"}}};
+
+Object.keys(figureData).forEach(function(divId) {
+    var fig = figureData[divId];
+    Plotly.newPlot(divId, fig.data, fig.layout, {responsive: true});
+});
+
+(function() {
+  var lastHeight = 0, timer;
+  function postHeight() {
+    clearTimeout(timer);
+    timer = setTimeout(function() {
+      var h = document.documentElement.scrollHeight;
+      if (h === lastHeight) return;
+      lastHeight = h;
+      window.parent.postMessage({type: 'uper-resize', height: h}, '*');
+    }, 100);
+  }
+  window.addEventListener('load', postHeight);
+  window.addEventListener('resize', postHeight);
+  setTimeout(postHeight, 800);
+  document.querySelectorAll('.plotly-chart').forEach(function(el) {
+    el.on && el.on('plotly_afterplot', postHeight);
+  });
+})();
+
+</script>
+</body>
+</html>

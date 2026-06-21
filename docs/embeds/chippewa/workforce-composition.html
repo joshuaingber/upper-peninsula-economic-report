@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chippewa County — Workforce Composition</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background-color: #FFFFFF;
+    color: #3D3D3D;
+    line-height: 1.6;
+    padding: 0.5rem;
+}
+
+h1, h2, h3, h4 { color: #095339; }
+
+/* KPI cards */
+.snapshot-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+.snapshot-row.single-county { display: block; max-width: 480px; margin: 0 auto 1rem; }
+.county-card {
+    flex: 1;
+    background: linear-gradient(135deg, #F8F9FA 0%, #FFFFFF 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border-left: 5px solid;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.county-card h3 { margin: 0 0 0.8rem 0; font-size: 1.3rem; }
+.kpi-row { display: flex; justify-content: space-between; gap: 0.8rem; }
+.kpi-item { flex: 1; text-align: center; }
+.kpi-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.2rem;
+    color: #3D3D3D;
+    min-height: 1.8rem;
+    line-height: 0.9rem;
+}
+.kpi-value { font-size: 1.4rem; font-weight: 700; color: #095339; }
+.kpi-delta { font-size: 0.8rem; margin-top: 0.1rem; }
+.kpi-delta.positive { color: #2E7D32; }
+.kpi-delta.negative { color: #C8102E; }
+.kpi-row.secondary {
+    margin-top: 0.9rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid #CCCCCC;
+}
+.kpi-period { font-size: 0.7rem; color: #888; margin-top: 0.15rem; }
+.kpi-caption {
+    font-size: 0.78rem;
+    color: #888;
+    margin: 0.75rem 0 0 0;
+    line-height: 1.3;
+}
+
+/* Chart sections */
+.section { margin: 0; }
+.section h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.section p { margin-bottom: 0.75rem; }
+
+.chart-row { display: flex; gap: 1rem; }
+.chart-col { flex: 1; min-width: 0; }
+
+.source {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.25rem;
+}
+.source a { color: #FFC425; text-decoration: none; }
+.source a:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+    .snapshot-row, .chart-row { flex-direction: column; }
+    body { padding: 0.3rem; }
+}
+
+</style>
+</head>
+<body>
+<div class="section"><h2>Workforce Composition</h2><p>In 2025 Q4, the county's largest private-sector employers are Retail Trade (24.8%), Accommodation & Food Services (14.6%), and Construction (13.6%).</p><div id="chippewa-employment-treemap" class="plotly-chart"></div><p class="source">Source: <a href="https://www.bls.gov/cew/">BLS QCEW</a> — Quarterly</p><p class="source"><em>Each rectangle is a 2-digit NAICS sector; size is total private employment in the displayed quarter. Use the buttons below the chart to view earlier years; the narrative reflects the most recent quarter. Colors group sectors into broad industry domains (matching the Industry Landscape chart). Sectors with suppressed BLS data and 'Unclassified' are excluded.</em></p></div>
+<script>
+var figureData = {"chippewa-employment-treemap": {"data": [{"customdata": {"dtype": "f8", "bdata": "+fs7Z/Wm0j8AAAAAAIBfQAAAAAAACNxA3LqFwXSHxT8AAAAAAIBcQAAAAAAA6dBAGW/J9Q7Ywj8AAAAAAABNQAAAAAAA/t9AwBI7kMDwuT8AAAAAAAA5QAAAAAAAT+dAWairTJMArD8AAAAAAABAQAAAAACA++NA+U4DoUZtqz8AAAAAAIBBQAAAAAAAgONAaZW82blUqz8AAAAAAIBVQAAAAACA0ulAt898D0eCqT8AAAAAAABSQAAAAAAAvNVA0EXwV2IHoj8AAAAAAIBEQAAAAAAAp+NAEsV26WHykz8AAAAAAAAqQAAAAAAAz+BAFfdN0voDhz8AAAAAAAAsQAAAAACAU+BAHPRnGPmvfj8AAAAAAAAzQAAAAAAAid9Amo7GacZifD8AAAAAAAAYQAAAAAAAZ9BA", "shape": "13, 3"}, "hovertemplate": "<b>%{label}</b><br>Employment: %{value:,.0f}<br>Establishments: %{customdata[1]:,.0f}<br>Average salary: $%{customdata[2]:,.0f}<br>Share of private workforce: %{customdata[0]:.1%}<extra></extra>", "labels": ["Retail Trade", "Accommodation & Food Services", "Health Care & Social Assistance", "Manufacturing", "Finance & Insurance", "Transportation & Warehousing", "Construction", "Other Services", "Professional & Technical Services", "Information", "Arts & Entertainment", "Real Estate", "Educational Services"], "marker": {"colors": ["#D4B98B", "#3D3D3D", "#7E8C84", "#C8102E", "#095339", "#D4B98B", "#C8102E", "#3D3D3D", "#FFC425", "#095339", "#3D3D3D", "#095339", "#7E8C84"], "line": {"color": "white", "width": 2}}, "name": "2019 Q4", "parents": ["", "", "", "", "", "", "", "", "", "", "", "", ""], "sort": true, "textfont": {"color": ["#3D3D3D", "white", "white", "white", "white", "#3D3D3D", "white", "white", "white", "white", "white", "white", "white"], "family": "Source Sans Pro, sans-serif", "size": 12}, "textinfo": "label+value", "texttemplate": "<b>%{label}</b><br>%{value:,.0f} (%{customdata[0]:.1%})", "values": {"dtype": "i2", "bdata": "FAaCAxIDHQIkAR4BHQEKAbwAaAA8ACgAJQA="}, "visible": false, "type": "treemap"}, {"customdata": {"dtype": "f8", "bdata": "UZ5AABWg0z8AAAAAAEBeQAAAAAAAQOBAx+hzePIzxT8AAAAAAABOQAAAAAAAN+FATCnSswoUvT8AAAAAAEBaQAAAAAAAC9NAVJrB654Muj8AAAAAAAA6QAAAAACAKelAbO2Pk1v2sD8AAAAAAABWQAAAAAAApOxAyHDal8CXrj8AAAAAAABDQAAAAAAAT+dAr5Wl0DVKrj8AAAAAAIBBQAAAAAAA3+RAppxPedPtpz8AAAAAAIBRQAAAAAAAI9lAUW8txI7MpD8AAAAAAABEQAAAAACA6eVAr5Wl0DVKjj8AAAAAAAAiQAAAAACAOONADKxQnkAAhT8AAAAAAAAyQAAAAACA8edARtOpZOqTgj8AAAAAAAAUQAAAAAAA+dRA0oT315Zsdz8AAAAAAAAqQAAAAAAA5OJA", "shape": "13, 3"}, "hovertemplate": "<b>%{label}</b><br>Employment: %{value:,.0f}<br>Establishments: %{customdata[1]:,.0f}<br>Average salary: $%{customdata[2]:,.0f}<br>Share of private workforce: %{customdata[0]:.1%}<extra></extra>", "labels": ["Retail Trade", "Health Care & Social Assistance", "Accommodation & Food Services", "Manufacturing", "Construction", "Finance & Insurance", "Transportation & Warehousing", "Other Services", "Professional & Technical Services", "Information", "Real Estate", "Educational Services", "Arts & Entertainment"], "marker": {"colors": ["#D4B98B", "#7E8C84", "#3D3D3D", "#C8102E", "#C8102E", "#095339", "#D4B98B", "#3D3D3D", "#FFC425", "#095339", "#095339", "#7E8C84", "#3D3D3D"], "line": {"color": "white", "width": 2}}, "name": "2020 Q4", "parents": ["", "", "", "", "", "", "", "", "", "", "", "", ""], "sort": true, "textfont": {"color": ["#3D3D3D", "white", "white", "white", "white", "white", "#3D3D3D", "white", "white", "white", "white", "white", "white"], "family": "Source Sans Pro, sans-serif", "size": 12}, "textinfo": "label+value", "texttemplate": "<b>%{label}</b><br>%{value:,.0f} (%{customdata[0]:.1%})", "values": {"dtype": "i2", "bdata": "EwZIA0ACBAJQAS8BLAHtAM4ASwA0AC4AHQA="}, "visible": false, "type": "treemap"}, {"customdata": {"dtype": "f8", "bdata": "oVeCx6xt0j8AAAAAAMBeQAAAAAAAqOBA71GsZOjKxT8AAAAAAMBcQAAAAAAAe9VA1N37rmUvxD8AAAAAAEBRQAAAAAAA1+JA6rC+zHmGuD8AAAAAAAA5QAAAAACAKelABEhQ8ibIrz8AAAAAAABXQAAAAACAG+xAFTRjmHeOqz8AAAAAAIBBQAAAAAAAjOZAAGrqWGgwqz8AAAAAAABCQAAAAAAA2uZAdmrzokY1pD8AAAAAAMBRQAAAAAAAQN1AawU3Az8GpD8AAAAAAABFQAAAAACA1+dAFTRjmHeOiz8AAAAAAAAzQAAAAAAAKOdAn/7kIWXxhD8AAAAAAAAmQAAAAAAAlOhANwyJ5Bgbgz8AAAAAAAAqQAAAAACAk+NA+eKTUh+Zfz8AAAAAAAAUQAAAAAAAvdJA", "shape": "13, 3"}, "hovertemplate": "<b>%{label}</b><br>Employment: %{value:,.0f}<br>Establishments: %{customdata[1]:,.0f}<br>Average salary: $%{customdata[2]:,.0f}<br>Share of private workforce: %{customdata[0]:.1%}<extra></extra>", "labels": ["Retail Trade", "Accommodation & Food Services", "Health Care & Social Assistance", "Manufacturing", "Construction", "Finance & Insurance", "Transportation & Warehousing", "Other Services", "Professional & Technical Services", "Real Estate", "Information", "Arts & Entertainment", "Educational Services"], "marker": {"colors": ["#D4B98B", "#3D3D3D", "#7E8C84", "#C8102E", "#C8102E", "#095339", "#D4B98B", "#3D3D3D", "#FFC425", "#095339", "#095339", "#3D3D3D", "#7E8C84"], "line": {"color": "white", "width": 2}}, "name": "2021 Q4", "parents": ["", "", "", "", "", "", "", "", "", "", "", "", ""], "sort": true, "textfont": {"color": ["#3D3D3D", "white", "white", "white", "white", "white", "#3D3D3D", "white", "white", "white", "white", "white", "white"], "family": "Source Sans Pro, sans-serif", "size": 12}, "textinfo": "label+value", "texttemplate": "<b>%{label}</b><br>%{value:,.0f} (%{customdata[0]:.1%})", "values": {"dtype": "i2", "bdata": "RQa1A28DFgJaASwBKAHcANoASwA5ADQAKwA="}, "visible": false, "type": "treemap"}, {"customdata": {"dtype": "f8", "bdata": "FsjCUlSV0j8AAAAAAEBfQAAAAAAAwuBA84T4of2Nxz8AAAAAAABeQAAAAAAAiNVAI79lBbKwxD8AAAAAAABTQAAAAACATuJAwSKejNoIuz8AAAAAAAA5QAAAAAAAI+lAKDctG/7Xsj8AAAAAAEBZQAAAAACA9/JA47CYuVDJrD8AAAAAAIBCQAAAAACAc+hAW3iuBXjHpT8AAAAAAEBTQAAAAAAAL9xA0or0zb5+pT8AAAAAAIBGQAAAAAAA1ehAIOKoz2IHjD8AAAAAAAA2QAAAAACAK+NAC2wqgPP3hT8AAAAAAAAoQAAAAAAAs+ZASZ06lgU2hT8AAAAAAAAmQAAAAAAAaOpAATFr2Dvwgj8AAAAAAAAYQAAAAAAA8dJA", "shape": "12, 3"}, "hovertemplate": "<b>%{label}</b><br>Employment: %{value:,.0f}<br>Establishments: %{customdata[1]:,.0f}<br>Average salary: $%{customdata[2]:,.0f}<br>Share of private workforce: %{customdata[0]:.1%}<extra></extra>", "labels": ["Retail Trade", "Accommodation & Food Services", "Health Care & Social Assistance", "Manufacturing", "Construction", "Finance & Insurance", "Other Services", "Professional & Technical Services", "Real Estate", "Arts & Entertainment", "Information", "Educational Services"], "marker": {"colors": ["#D4B98B", "#3D3D3D", "#7E8C84", "#C8102E", "#C8102E", "#095339", "#3D3D3D", "#FFC425", "#095339", "#3D3D3D", "#095339", "#7E8C84"], "line": {"color": "white", "width": 2}}, "name": "2022 Q4", "parents": ["", "", "", "", "", "", "", "", "", "", "", ""], "sort": true, "textfont": {"color": ["#3D3D3D", "white", "white", "white", "white", "white", "white", "white", "white", "white", "white", "white"], "family": "Source Sans Pro, sans-serif", "size": 12}, "textinfo": "label+value", "texttemplate": "<b>%{label}</b><br>%{value:,.0f} (%{customdata[0]:.1%})", "values": {"dtype": "i2", "bdata": "IgbjA2oDOwKOATAB5gDjAEoAOgA4ADIA"}, "visible": false, "type": "treemap"}, {"customdata": {"dtype": "f8", "bdata": "+wHcZLtA0T8AAAAAAEBgQAAAAAAAN+FANo6phIXkxT8AAAAAAGBgQAAAAAAAnddA9/lhe39GwT8AAAAAAABUQAAAAACAUuNAUptYa4tzuT8AAAAAAAA6QAAAAACA/epAnRv5AkoXuT8AAAAAAMBaQAAAAABANPZAaAqD0deTqj8AAAAAAABCQAAAAAAA3epAPCwuBT9TqD8AAAAAAABDQAAAAACAnexAaC2wYznipj8AAAAAAABWQAAAAAAAz91AwC+0IC4ApD8AAAAAAABHQAAAAAAA5ulA/eeWbvOMjT8AAAAAAAA6QAAAAAAAQ+RA+Gw/gJtshz8AAAAAAAAsQAAAAACAjehAMPAkBMx1gz8AAAAAAAAkQAAAAAAAsulA8vHnkUNMgT8AAAAAAAAYQAAAAAAAZtNA", "shape": "13, 3"}, "hovertemplate": "<b>%{label}</b><br>Employment: %{value:,.0f}<br>Establishments: %{customdata[1]:,.0f}<br>Average salary: $%{customdata[2]:,.0f}<br>Share of private workforce: %{customdata[0]:.1%}<extra></extra>", "labels": ["Retail Trade", "Accommodation & Food Services", "Health Care & Social Assistance", "Manufacturing", "Construction", "Transportation & Warehousing", "Finance & Insurance", "Other Services", "Professional & Technical Services", "Real Estate", "Arts & Entertainment", "Information", "Educational Services"], "marker": {"colors": ["#D4B98B", "#3D3D3D", "#7E8C84", "#C8102E", "#C8102E", "#D4B98B", "#095339", "#3D3D3D", "#FFC425", "#095339", "#3D3D3D", "#095339", "#7E8C84"], "line": {"color": "white", "width": 2}}, "name": "2023 Q4", "parents": ["", "", "", "", "", "", "", "", "", "", "", "", ""], "sort": true, "textfont": {"color": ["#3D3D3D", "white", "white", "white", "white", "#3D3D3D", "white", "white", "white", "white", "white", "white", "white"], "family": "Source Sans Pro, sans-serif", "size": 12}, "textinfo": "label+value", "texttemplate": "<b>%{label}</b><br>%{value:,.0f} (%{customdata[0]:.1%})", "values": {"dtype": "i2", "bdata": "/AXMA/8CNQItAicBDgH+AN4AUgBBADYAMAA="}, "visible": false, "type": "treemap"}, {"customdata": {"dtype": "f8", "bdata": "eAp3K3mn0D8AAAAAAABdQAAAAACA2eFATU/LwtL0xD8AAAAAAIBbQAAAAAAAaddA0iAN0iANwj8AAAAAAIBSQAAAAAAAGONA8NLpXgMvvT8AAAAAAABZQAAAAACAyvdA8aaRuQ5vuj8AAAAAAAA5QAAAAACAyepAGqRBGqRBqj8AAAAAAAA9QAAAAAAAsulAAnGh5iQQpz8AAAAAAABCQAAAAACAU+1AZmFpeloWpj8AAAAAAABAQAAAAACA+/NAXiQxGeZFoj8AAAAAAIBRQAAAAAAASN9AjeIhy80ojj8AAAAAAAA3QAAAAAAAs+ZA+l/BKqX/hT8AAAAAAAAqQAAAAACA0O9A2htBO6a9gT8AAAAAAAAcQAAAAAAAV+lALRah/NBigT8AAAAAAAAYQAAAAAAA1dhA", "shape": "13, 3"}, "hovertemplate": "<b>%{label}</b><br>Employment: %{value:,.0f}<br>Establishments: %{customdata[1]:,.0f}<br>Average salary: $%{customdata[2]:,.0f}<br>Share of private workforce: %{customdata[0]:.1%}<extra></extra>", "labels": ["Retail Trade", "Accommodation & Food Services", "Health Care & Social Assistance", "Construction", "Manufacturing", "Transportation & Warehousing", "Finance & Insurance", "Admin & Waste Services", "Other Services", "Real Estate", "Arts & Entertainment", "Information", "Educational Services"], "marker": {"colors": ["#D4B98B", "#3D3D3D", "#7E8C84", "#C8102E", "#C8102E", "#D4B98B", "#095339", "#FFC425", "#3D3D3D", "#095339", "#3D3D3D", "#095339", "#7E8C84"], "line": {"color": "white", "width": 2}}, "name": "2024 Q4", "parents": ["", "", "", "", "", "", "", "", "", "", "", "", ""], "sort": true, "textfont": {"color": ["#3D3D3D", "white", "white", "white", "white", "#3D3D3D", "white", "white", "white", "white", "white", "white", "white"], "family": "Source Sans Pro, sans-serif", "size": 12}, "textinfo": "label+value", "texttemplate": "<b>%{label}</b><br>%{value:,.0f} (%{customdata[0]:.1%})", "values": {"dtype": "i2", "bdata": "3gWxAy4DkgJUAigBBAH5AM4AVQA+ADIAMQA="}, "visible": false, "type": "treemap"}, {"customdata": {"dtype": "f8", "bdata": "x+xI56a7zz8AAAAAAEBeQAAAAAAAMuNAY0Ld7Cazwj8AAAAAAABbQAAAAAAA79hA8egg3R91wT8AAAAAAABZQAAAAAAA//xAY9xAMH1IwT8AAAAAAABSQAAAAACANOJApVGfSdcFuj8AAAAAAAA6QAAAAAAAUe5ANPrUin+ysT8AAAAAAAA9QAAAAACA8vRA4EYGcFZRpj8AAAAAAIBBQAAAAAAAXu5AybxlAllmpD8AAAAAAIBIQAAAAAAAm+1AJCbl57hOoj8AAAAAAIBSQAAAAAAAA+FAKnQHpZaAij8AAAAAAAA3QAAAAACAXOxAqRSGvMuehT8AAAAAAAAqQAAAAAAAEetA8YKEIHYKgD8AAAAAAAAcQAAAAAAAuttAdKEI2tavfj8AAAAAAAAYQAAAAACAp+hAX+eEh4tvcT8AAAAAAAAmQAAAAAAATupAvA8HPoEbWT8AAAAAAAAIQAAAAAAAyu9A", "shape": "15, 3"}, "hovertemplate": "<b>%{label}</b><br>Employment: %{value:,.0f}<br>Establishments: %{customdata[1]:,.0f}<br>Average salary: $%{customdata[2]:,.0f}<br>Share of private workforce: %{customdata[0]:.1%}<extra></extra>", "labels": ["Retail Trade", "Accommodation & Food Services", "Construction", "Health Care & Social Assistance", "Manufacturing", "Transportation & Warehousing", "Finance & Insurance", "Professional & Technical Services", "Other Services", "Real Estate", "Arts & Entertainment", "Educational Services", "Information", "Agriculture", "Mining"], "marker": {"colors": ["#D4B98B", "#3D3D3D", "#C8102E", "#7E8C84", "#C8102E", "#D4B98B", "#095339", "#FFC425", "#3D3D3D", "#095339", "#3D3D3D", "#7E8C84", "#095339", "#C8102E", "#C8102E"], "line": {"color": "white", "width": 2}}, "name": "2025 Q4", "parents": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "sort": true, "textfont": {"color": ["#3D3D3D", "white", "white", "white", "white", "#3D3D3D", "white", "white", "white", "white", "white", "white", "white", "white", "white"], "family": "Source Sans Pro, sans-serif", "size": 12}, "textinfo": "label+value", "texttemplate": "<b>%{label}</b><br>%{value:,.0f} (%{customdata[0]:.1%})", "values": {"dtype": "i2", "bdata": "sAVaAyEDGQNVApYBAAHqANIATAA+AC4ALAAZAAkA"}, "visible": true, "type": "treemap"}], "layout": {"template": {"data": {"candlestick": [{"decreasing": {"line": {"color": "#000033"}}, "increasing": {"line": {"color": "#000032"}}, "type": "candlestick"}], "contourcarpet": [{"colorscale": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]], "type": "contourcarpet"}], "contour": [{"colorscale": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]], "type": "contour"}], "heatmap": [{"colorscale": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]], "type": "heatmap"}], "histogram2d": [{"colorscale": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]], "type": "histogram2d"}], "icicle": [{"textfont": {"color": "white"}, "type": "icicle"}], "sankey": [{"textfont": {"color": "#000036"}, "type": "sankey"}], "scatter": [{"marker": {"line": {"width": 0}}, "type": "scatter"}], "table": [{"cells": {"fill": {"color": "#000038"}, "font": {"color": "#000037"}, "line": {"color": "#000039"}}, "header": {"fill": {"color": "#000040"}, "font": {"color": "#000036"}, "line": {"color": "#000039"}}, "type": "table"}], "waterfall": [{"connector": {"line": {"color": "#000036", "width": 2}}, "decreasing": {"marker": {"color": "#000033"}}, "increasing": {"marker": {"color": "#000032"}}, "totals": {"marker": {"color": "#000034"}}, "type": "waterfall"}]}, "layout": {"coloraxis": {"colorscale": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]]}, "colorscale": {"diverging": [[0.0, "#000021"], [0.1, "#000022"], [0.2, "#000023"], [0.3, "#000024"], [0.4, "#000025"], [0.5, "#000026"], [0.6, "#000027"], [0.7, "#000028"], [0.8, "#000029"], [0.9, "#000030"], [1.0, "#000031"]], "sequential": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]], "sequentialminus": [[0.0, "#000011"], [0.1111111111111111, "#000012"], [0.2222222222222222, "#000013"], [0.3333333333333333, "#000014"], [0.4444444444444444, "#000015"], [0.5555555555555556, "#000016"], [0.6666666666666666, "#000017"], [0.7777777777777778, "#000018"], [0.8888888888888888, "#000019"], [1.0, "#000020"]]}, "colorway": ["#000001", "#000002", "#000003", "#000004", "#000005", "#000006", "#000007", "#000008", "#000009", "#000010"]}}, "margin": {"t": 30, "b": 70, "l": 10, "r": 10}, "plot_bgcolor": "white", "paper_bgcolor": "white", "height": 560, "updatemenus": [{"active": 6, "bgcolor": "white", "bordercolor": "#CCCCCC", "borderwidth": 1, "buttons": [{"args": [{"visible": [true, false, false, false, false, false, false]}], "label": "2019", "method": "update"}, {"args": [{"visible": [false, true, false, false, false, false, false]}], "label": "2020", "method": "update"}, {"args": [{"visible": [false, false, true, false, false, false, false]}], "label": "2021", "method": "update"}, {"args": [{"visible": [false, false, false, true, false, false, false]}], "label": "2022", "method": "update"}, {"args": [{"visible": [false, false, false, false, true, false, false]}], "label": "2023", "method": "update"}, {"args": [{"visible": [false, false, false, false, false, true, false]}], "label": "2024", "method": "update"}, {"args": [{"visible": [false, false, false, false, false, false, true]}], "label": "2025", "method": "update"}], "direction": "right", "font": {"color": "#3D3D3D", "size": 11}, "pad": {"b": 4, "t": 8}, "type": "buttons", "x": 0.5, "xanchor": "center", "y": -0.05, "yanchor": "top"}]}}};
+
+Object.keys(figureData).forEach(function(divId) {
+    var fig = figureData[divId];
+    Plotly.newPlot(divId, fig.data, fig.layout, {responsive: true});
+});
+
+(function() {
+  var lastHeight = 0, timer;
+  function postHeight() {
+    clearTimeout(timer);
+    timer = setTimeout(function() {
+      var h = document.documentElement.scrollHeight;
+      if (h === lastHeight) return;
+      lastHeight = h;
+      window.parent.postMessage({type: 'uper-resize', height: h}, '*');
+    }, 100);
+  }
+  window.addEventListener('load', postHeight);
+  window.addEventListener('resize', postHeight);
+  setTimeout(postHeight, 800);
+  document.querySelectorAll('.plotly-chart').forEach(function(el) {
+    el.on && el.on('plotly_afterplot', postHeight);
+  });
+})();
+
+</script>
+</body>
+</html>

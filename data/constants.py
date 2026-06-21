@@ -148,13 +148,29 @@ FRED_GDP_SERIES = {
     name: f"REALGDPALL{fips}" for fips, name in COUNTIES.items()
 }
 
-# Unemployment rate series (monthly %, NSA). The standard BLS LAUS county
-# unemployment-rate series is carried on FRED as LAUCN{5-digit FIPS}0000000003
-# (measure code 03 = unemployment rate), so these are FIPS-derivable too.
-# fetch_fred tolerates any county whose series is missing rather than dropping
-# the whole set.
+# Unemployment rate series (monthly %, NSA). These are FRED's curated
+# county series ({state}{county-abbrev}{n}URN) and are NOT derivable from FIPS
+# — they were resolved via FRED search (title "Unemployment Rate in <County>
+# County, MI", monthly, NSA) and verified against the API. The FIPS-derivable
+# LAUCN{fips}0000000003 family only carries the ANNUAL rate (…03A) at the
+# county level, not a monthly one, so the curated URN series are used instead.
+# Bump an ID here if FRED renames it. fetch_fred tolerates a missing county.
 FRED_UNRATE_SERIES = {
-    name: f"LAUCN{fips}0000000003" for fips, name in COUNTIES.items()
+    "Gogebic":     "MIGOGE3URN",
+    "Ontonagon":   "MIONTO1URN",
+    "Iron":        "MIIRON1URN",
+    "Houghton":    "MIHOUG1URN",
+    "Keweenaw":    "MIKEWE3URN",
+    "Baraga":      "MIBARA3URN",
+    "Dickinson":   "MIDICK3URN",
+    "Menominee":   "MIMENO9URN",
+    "Marquette":   "MIMARQ5URN",
+    "Alger":       "MIALGE3URN",
+    "Delta":       "MIDELT1URN",
+    "Schoolcraft": "MISCHO3URN",
+    "Luce":        "MILUCE5URN",
+    "Mackinac":    "MIMACK7URN",
+    "Chippewa":    "MICHIP3URN",
 }
 
 # IRS Statistics of Income county-to-county migration data. Year pair is the
