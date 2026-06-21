@@ -28,6 +28,23 @@ streamlit run app.py
 
 First load fetches the QCEW data for all 15 UP counties and caches to `data/cache/`. Subsequent runs load from disk. The interactive county map fetches the US-counties GeoJSON once and caches it to `data/cache/us_counties.geojson`.
 
+## Configuration (FRED API key)
+
+The Real GDP and unemployment-rate KPI cells come from FRED and need a free API key (get one instantly at https://fredaccount.stlouisfed.org/apikeys). Everything else — the county map, growth charts, trends, treemap, and firm-formation — comes from BLS QCEW and needs no key; without a FRED key those two KPI cells simply render as "—".
+
+Copy `.env.example` to `.env` and add your own key:
+
+```bash
+cp .env.example .env
+# then edit .env:  FRED_API_KEY=your_key_here
+```
+
+`.env` is gitignored and loaded automatically (via `python-dotenv`) by both `streamlit run app.py` and `python build.py`. **Use your own key** — FRED keys are tied to an individual account and rate limit; never commit one or reuse someone else's. For the GitHub Action, store the key as a repository secret instead:
+
+```bash
+gh secret set FRED_API_KEY --repo <owner>/<repo>
+```
+
 ## Building the static site
 
 ```bash

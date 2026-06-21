@@ -20,6 +20,15 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+# Load a local .env (FRED_API_KEY=...) if present, so contributors don't have to
+# export the variable by hand. Optional: if python-dotenv isn't installed, or no
+# .env exists, we fall back to whatever is already in the environment.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from data.constants import FRED_API_BASE, FRED_GDP_SERIES, FRED_UNRATE_SERIES
 
 CACHE_DIR = Path(__file__).parent / "cache"
