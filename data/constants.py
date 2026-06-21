@@ -1,6 +1,11 @@
 """
-Constants for the South Florida Regional Economic Dashboard.
+Constants for the Upper Peninsula Regional Economic Dashboard.
 FIPS codes, NAICS labels, ownership codes, color palettes, and API config.
+
+Adapted from Bryan Cutsinger's South Florida Economic Report
+(https://github.com/bryanpcutsinger/south-florida-economic-report, MIT).
+The geography here is the 15 counties of Michigan's Upper Peninsula; branding
+follows the Northern Michigan University palette.
 """
 from datetime import date
 
@@ -14,29 +19,79 @@ YEARS = list(range(START_YEAR, END_YEAR + 1))
 QUARTERS = [1, 2, 3, 4]
 
 # ── Counties ──────────────────────────────────────────────────────────────────
+# The 15 counties of Michigan's Upper Peninsula (state FIPS 26). Ordered
+# geographically west → east so dropdowns and legends read sensibly.
 COUNTIES = {
-    "12099": "Palm Beach",
-    "12011": "Broward",
-    "12086": "Miami-Dade",
+    "26053": "Gogebic",
+    "26131": "Ontonagon",
+    "26071": "Iron",
+    "26061": "Houghton",
+    "26083": "Keweenaw",
+    "26013": "Baraga",
+    "26043": "Dickinson",
+    "26109": "Menominee",
+    "26103": "Marquette",
+    "26003": "Alger",
+    "26041": "Delta",
+    "26153": "Schoolcraft",
+    "26095": "Luce",
+    "26097": "Mackinac",
+    "26033": "Chippewa",
 }
 
-# ── FAU Color Palette ────────────────────────────────────────────────────────
-FAU_BLUE = "#003366"
-FAU_RED = "#CC0000"
-FAU_DARK_GRAY = "#4D4C55"
-FAU_GRAY = "#CCCCCC"
-FAU_ELECTRIC_BLUE = "#126BD9"
-FAU_STONE = "#7A97AB"
-FAU_SKY_BLUE = "#D9ECFF"
-FAU_SAND = "#D4B98B"
+# State FIPS shared by every UP county — used by the choropleth and the IRS
+# migration filter.
+STATE_FIPS = "26"
 
+# ── Northern Michigan University Color Palette ───────────────────────────────
+# Primary brand marks (NMU Institutional Brand Standards):
+#   NMU Green  #095339  (Pantone 343 C)
+#   NMU Gold   #FFC425  (Pantone 123 C)
+# Supporting neutrals/accents are brand-compatible derivations; a true semantic
+# red is retained for "negative" deltas regardless of brand (lower-is-worse).
+NMU_GREEN = "#095339"
+NMU_GOLD = "#FFC425"
+NMU_LIGHT_GREEN = "#3F7E5E"
+NMU_DARK_GRAY = "#3D3D3D"
+NMU_GRAY = "#CCCCCC"
+NMU_STONE = "#7E8C84"
+NMU_PALE_GREEN = "#E3EFE8"
+NMU_SAND = "#D4B98B"
+SEMANTIC_RED = "#C8102E"
+
+# Backward-compatible aliases. The components import these `FAU_*` names; rather
+# than rename every import, we re-point the names at the NMU palette so the whole
+# app re-skins from one place. (Names kept for diff minimalism, values are NMU.)
+FAU_BLUE = NMU_GREEN
+FAU_RED = SEMANTIC_RED
+FAU_DARK_GRAY = NMU_DARK_GRAY
+FAU_GRAY = NMU_GRAY
+FAU_ELECTRIC_BLUE = NMU_GOLD
+FAU_STONE = NMU_STONE
+FAU_SKY_BLUE = NMU_PALE_GREEN
+FAU_SAND = NMU_SAND
+
+# Per-county identity colors for the single-county trend charts. Fifteen counties
+# don't get fifteen meaningfully distinct hues, so we cycle a small NMU-derived
+# qualitative set; the map and top-counties charts carry their own color logic.
+_COUNTY_PALETTE = [
+    NMU_GREEN, NMU_GOLD, NMU_LIGHT_GREEN, NMU_STONE, NMU_SAND,
+    NMU_DARK_GRAY, SEMANTIC_RED,
+]
 COUNTY_COLORS = {
-    "Palm Beach": FAU_BLUE,
-    "Broward": FAU_RED,
-    "Miami-Dade": FAU_ELECTRIC_BLUE,
+    name: _COUNTY_PALETTE[i % len(_COUNTY_PALETTE)]
+    for i, name in enumerate(COUNTIES.values())
 }
 
-# Industry → FAU palette color, grouped by broad domain. Used by the Growth
+# Diverging color scale for the choropleth map (OTY employment % change):
+# red (decline) → pale → NMU green (growth).
+MAP_DIVERGING_SCALE = [
+    [0.0, SEMANTIC_RED],
+    [0.5, NMU_PALE_GREEN],
+    [1.0, NMU_GREEN],
+]
+
+# Industry → NMU palette color, grouped by broad domain. Used by the Growth
 # Quadrant chart, which colors bubbles by domain rather than by county.
 INDUSTRY_DOMAIN_COLORS = {
     # Goods-producing
@@ -86,19 +141,20 @@ AGGLVL_US_BY_OWN = 11      # U.S. total by ownership; rows for own_codes 1, 2, 3
 
 FRED_API_BASE = "https://api.stlouisfed.org/fred"
 
-# Real GDP series (annual, thousands of chained 2017 dollars). FIPS-derivable.
+# Real GDP series (annual, thousands of chained 2017 dollars). BEA publishes
+# real GDP for every county; FRED mirrors it as REALGDPALL{5-digit FIPS}, so
+# the series IDs are fully FIPS-derivable.
 FRED_GDP_SERIES = {
-    "Palm Beach": "REALGDPALL12099",
-    "Broward":    "REALGDPALL12011",
-    "Miami-Dade": "REALGDPALL12086",
+    name: f"REALGDPALL{fips}" for fips, name in COUNTIES.items()
 }
 
-# Unemployment rate series (monthly %, NSA). IDs are NOT derivable from FIPS —
-# verified manually via FRED search. Bump if any series ID is renamed.
+# Unemployment rate series (monthly %, NSA). The standard BLS LAUS county
+# unemployment-rate series is carried on FRED as LAUCN{5-digit FIPS}0000000003
+# (measure code 03 = unemployment rate), so these are FIPS-derivable too.
+# fetch_fred tolerates any county whose series is missing rather than dropping
+# the whole set.
 FRED_UNRATE_SERIES = {
-    "Palm Beach": "FLPALM2URN",
-    "Broward":    "FLBROW5URN",
-    "Miami-Dade": "FLMIAM6URN",
+    name: f"LAUCN{fips}0000000003" for fips, name in COUNTIES.items()
 }
 
 # IRS Statistics of Income county-to-county migration data. Year pair is the

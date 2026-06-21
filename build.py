@@ -31,14 +31,28 @@ from components.growth_quadrant import (
 GROWTH_QUADRANT_NOTE = f'<p class="source"><em>{_GROWTH_QUADRANT_TEXT}</em></p>'
 from data.constants import (
     FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_GRAY,
-    FAU_ELECTRIC_BLUE, FAU_SKY_BLUE, COUNTY_COLORS,
+    FAU_ELECTRIC_BLUE, FAU_SKY_BLUE, COUNTY_COLORS, COUNTIES,
 )
 from utils.formatting import fmt_number, fmt_currency, fmt_pct
 from utils.narratives import narrate_employment_trends, format_industry_list
 
 DOCS_DIR = Path(__file__).parent / "docs"
 MIN_EMPLOYMENT = 100
-COUNTY_ORDER = ["Palm Beach", "Broward", "Miami-Dade"]
+
+# Per-county deep dives are generated for the N largest county economies (by
+# latest employment). All 15 counties × 4 sections would be 60 embeds and an
+# unwieldy 15-tab strip; the largest five keep the static build and the
+# iframe set manageable while covering the bulk of UP employment.
+DETAIL_COUNTY_N = 5
+
+
+def _detail_counties(df) -> list[str]:
+    """Names of the N largest UP county economies for per-county detail/embeds."""
+    from components.top_counties import get_top_counties
+    top = get_top_counties(df, DETAIL_COUNTY_N)
+    if not top.empty:
+        return top["county_name"].tolist()
+    return list(COUNTIES.values())[:DETAIL_COUNTY_N]
 
 # ── CSS ──────────────────────────────────────────────────────────────────────
 
@@ -270,7 +284,7 @@ h1, h2, h3, h4 { color: """ + FAU_BLUE + """; }
 }
 """
 
-# Each embed posts its rendered height to the parent FAU page via postMessage.
+# Each embed posts its rendered height to the parent host page via postMessage.
 # Debounce (100 ms) + last-height dedupe kill the feedback loop where Plotly's
 # responsive: true would re-fire layout when the parent resizes the iframe.
 EMBED_JS = """
@@ -287,7 +301,7 @@ Object.keys(figureData).forEach(function(divId) {
       var h = document.documentElement.scrollHeight;
       if (h === lastHeight) return;
       lastHeight = h;
-      window.parent.postMessage({type: 'sfer-resize', height: h}, '*');
+      window.parent.postMessage({type: 'uper-resize', height: h}, '*');
     }, 100);
   }
   window.addEventListener('load', postHeight);
@@ -730,35 +744,72 @@ def build_html(df):
     df_unrate_secondary = fetch_unemployment_rate()
     df_irs_secondary = fetch_irs_migration()
 
-    # KPI cards
-    kpi_cards = ""
-    for county_name in COUNTY_ORDER:
+    # ── Front-page visuals: interactive county map + largest-county comparison
+    from components.county_map import build_figure as _map_fig, _load_geojson
+    from components.top_counties import build_figure as _top_fig, get_top_counties
+    from data.clean import latest_county_summaries
+
+    summary = latest_county_summaries(df)
+    geojson = _load_geojson()
+    if not summary.empty and geojson is not None:
+        figures["up-county-map"] = _fig_json(_map_fig(summary, geojson))
+        map_html = (
+            '<div class="section"><h2>Upper Peninsula at a Glance</h2>'
+            '<p>Counties are shaded by year-over-year employment growth (latest '
+            'published QCEW quarter). Hover any county for its employment, '
+            'establishment count, and average salary.</p>'
+            '<div id="up-county-map" class="plotly-chart"></div>'
+            f'{SOURCE}</div>'
+        )
+    else:
+        map_html = (
+            '<div class="section"><h2>Upper Peninsula at a Glance</h2>'
+            '<p>County map unavailable.</p></div>'
+        )
+
+    top = get_top_counties(df)
+    if not top.empty:
+        figures["up-top-counties"] = _fig_json(_top_fig(top))
+        top_html = (
+            '<div class="section"><h2>Largest County Economies</h2>'
+            '<p>The five UP counties with the most covered employment, compared on '
+            'year-over-year growth in jobs, businesses, and wages.</p>'
+            '<div id="up-top-counties" class="plotly-chart"></div>'
+            f'{SOURCE}</div>'
+        )
+    else:
+        top_html = (
+            '<div class="section"><h2>Largest County Economies</h2>'
+            '<p>No disclosable county totals available.</p></div>'
+        )
+
+    # ── Per-county detail tabs (KPI card + four chart sections each), limited
+    # to the largest county economies.
+    tab_buttons = ""
+    tab_content = ""
+    for idx, county_name in enumerate(_detail_counties(df)):
         county_df = df[df["county_name"] == county_name]
+        county_id = county_name.lower().replace(" ", "-")
+        active = " active" if idx == 0 else ""
         color = COUNTY_COLORS.get(county_name, FAU_BLUE)
         secondary = {
             "gdp": latest_gdp_with_growth(df_gdp_secondary, county_name),
             "unrate": latest_unrate_with_yoy(df_unrate_secondary, county_name),
             "irs": latest_irs_net(df_irs_secondary, county_name),
         }
-        kpi_cards += build_kpi_card(county_df, county_name, color, secondary)
-
-    # Tab buttons + tab content
-    tab_buttons = ""
-    tab_content = ""
-    for county_name in COUNTY_ORDER:
-        county_df = df[df["county_name"] == county_name]
-        county_id = county_name.lower().replace(" ", "-")
-        active = " active" if county_name == COUNTY_ORDER[0] else ""
 
         tab_buttons += (
             f'<button class="tab-btn{active}" data-tab="{county_id}" '
             f"onclick=\"showTab('{county_id}')\">{county_name} County</button>\n"
         )
 
-        sections = []
-        for i, (_slug, builder) in enumerate(SECTION_BUILDERS):
-            if i > 0:
-                sections.append('<div class="divider"></div>')
+        sections = [
+            f'<div class="snapshot-row single-county">'
+            f'{build_kpi_card(county_df, county_name, color, secondary)}</div>',
+            KPI_CAPTION_HTML,
+        ]
+        for _slug, builder in SECTION_BUILDERS:
+            sections.append('<div class="divider"></div>')
             section_html, section_figs = builder(county_df, county_name, county_id)
             sections.append(section_html)
             figures.update(section_figs)
@@ -777,7 +828,7 @@ def build_html(df):
         "<head>",
         '<meta charset="UTF-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-        "<title>South Florida Regional Economic Report</title>",
+        "<title>Upper Peninsula Regional Economic Report</title>",
         '<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>',
         "<style>",
         CSS,
@@ -785,15 +836,16 @@ def build_html(df):
         "</head>",
         "<body>",
         "<header>",
-        f'<h1 class="main-title">South Florida Regional Economic Report</h1>',
-        f'<p class="main-subtitle">Quarterly Census of Employment and Wages (QCEW) &mdash; '
-        f'Palm Beach, Broward &amp; Miami-Dade Counties</p>',
+        '<h1 class="main-title">Upper Peninsula Regional Economic Report</h1>',
+        '<p class="main-subtitle">Quarterly Census of Employment and Wages (QCEW) &mdash; '
+        'the 15 counties of Michigan&rsquo;s Upper Peninsula</p>',
         f'<div class="data-badge">{badge}</div>',
         "</header>",
-        f'<h3 style="color: {FAU_BLUE};">Regional Snapshot</h3>',
-        f'<div class="snapshot-row">{kpi_cards}</div>',
-        KPI_CAPTION_HTML,
+        map_html,
         '<div class="divider"></div>',
+        top_html,
+        '<div class="divider"></div>',
+        f'<h3 style="color: {FAU_BLUE};">County Detail</h3>',
         f'<div class="tab-bar">{tab_buttons}</div>',
         tab_content,
         '<footer class="footer">',
@@ -823,75 +875,90 @@ KPI_CAPTION_HTML = (
 
 
 def write_embeds(df):
-    """Emit one standalone embed page per chart, plus one for the KPI row.
+    """Emit standalone embed pages: the region overview visuals plus per-county
+    KPI cards and chart sections for the largest county economies.
 
     File layout:
-        docs/embeds/kpi-cards.html
-        docs/embeds/<county-slug>/<section-slug>.html  (4 per county × 3 counties)
+        docs/embeds/up-map.html              (interactive county choropleth)
+        docs/embeds/up-top-counties.html     (largest-county growth comparison)
+        docs/embeds/kpi-<county-slug>.html   (one per detail county)
+        docs/embeds/<county-slug>/<section-slug>.html  (4 per detail county)
 
     Each output is a self-contained HTML page wrapping the same fragments
-    used by the main dashboard — so visuals stay identical and the Monday
+    used by the main dashboard — so visuals stay identical and the weekly
     GitHub Action regenerates them on the same cadence as docs/index.html.
     """
     from data.fetch_fred import fetch_real_gdp, fetch_unemployment_rate
     from data.fetch_irs_migration import fetch_irs_migration
     from data.clean import (
         latest_gdp_with_growth, latest_unrate_with_yoy, latest_irs_net,
+        latest_county_summaries,
     )
+    from components.county_map import build_figure as _map_fig, _load_geojson
+    from components.top_counties import build_figure as _top_fig, get_top_counties
 
     embeds_dir = DOCS_DIR / "embeds"
     embeds_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── KPI embeds: combined 3-county card + one per-county card each. ───────
     df_gdp = fetch_real_gdp()
     df_unrate = fetch_unemployment_rate()
     df_irs = fetch_irs_migration()
 
-    # Build each county's KPI card once; reuse for the combined embed and
-    # the per-county embeds.
-    county_cards: dict[str, str] = {}
-    for county_name in COUNTY_ORDER:
+    # ── Region overview embeds: interactive map + largest-county comparison. ─
+    summary = latest_county_summaries(df)
+    geojson = _load_geojson()
+    if not summary.empty and geojson is not None:
+        map_body = (
+            '<div class="section"><h2>Upper Peninsula at a Glance</h2>'
+            '<div id="up-county-map" class="plotly-chart"></div></div>'
+        )
+        (embeds_dir / "up-map.html").write_text(
+            wrap_as_embed(
+                map_body, {"up-county-map": _fig_json(_map_fig(summary, geojson))},
+                "Upper Peninsula — County Map",
+            ),
+            encoding="utf-8",
+        )
+
+    top = get_top_counties(df)
+    if not top.empty:
+        top_body = (
+            '<div class="section"><h2>Largest County Economies</h2>'
+            '<div id="up-top-counties" class="plotly-chart"></div></div>'
+        )
+        (embeds_dir / "up-top-counties.html").write_text(
+            wrap_as_embed(
+                top_body, {"up-top-counties": _fig_json(_top_fig(top))},
+                "Upper Peninsula — Largest County Economies",
+            ),
+            encoding="utf-8",
+        )
+
+    # ── Per-county KPI + chart embeds for the largest county economies. ──────
+    order = _detail_counties(df)
+    for county_name in order:
         county_df = df[df["county_name"] == county_name]
+        county_id = county_name.lower().replace(" ", "-")
         color = COUNTY_COLORS.get(county_name, FAU_BLUE)
         secondary = {
             "gdp": latest_gdp_with_growth(df_gdp, county_name),
             "unrate": latest_unrate_with_yoy(df_unrate, county_name),
             "irs": latest_irs_net(df_irs, county_name),
         }
-        county_cards[county_name] = build_kpi_card(county_df, county_name, color, secondary)
-
-    # Combined 3-county snapshot (existing FAU embed — must keep URL stable).
-    kpi_body = (
-        f'<h3 style="color: {FAU_BLUE}; margin-bottom: 0.5rem;">Regional Snapshot</h3>'
-        f'<div class="snapshot-row">{"".join(county_cards.values())}</div>'
-        f'{KPI_CAPTION_HTML}'
-    )
-    (embeds_dir / "kpi-cards.html").write_text(
-        wrap_as_embed(kpi_body, {}, "South Florida Regional Snapshot"),
-        encoding="utf-8",
-    )
-
-    # Per-county snapshots — one iframe per county for individual data pages.
-    for county_name, card_html in county_cards.items():
-        slug = county_name.lower().replace(" ", "-")
+        card_html = build_kpi_card(county_df, county_name, color, secondary)
         body = (
             f'<h3 style="color: {FAU_BLUE}; margin-bottom: 0.5rem;">'
             f'{county_name} County Snapshot</h3>'
             f'<div class="snapshot-row single-county">{card_html}</div>'
             f'{KPI_CAPTION_HTML}'
         )
-        (embeds_dir / f"kpi-{slug}.html").write_text(
+        (embeds_dir / f"kpi-{county_id}.html").write_text(
             wrap_as_embed(body, {}, f"{county_name} County — KPI Snapshot"),
             encoding="utf-8",
         )
 
-    # ── Per-county chart embeds: 4 sections × 3 counties = 12 files. ─────────
-    for county_name in COUNTY_ORDER:
-        county_df = df[df["county_name"] == county_name]
-        county_id = county_name.lower().replace(" ", "-")
         county_dir = embeds_dir / county_id
         county_dir.mkdir(parents=True, exist_ok=True)
-
         for slug, builder in SECTION_BUILDERS:
             section_html, section_figs = builder(county_df, county_name, county_id)
             title = f"{county_name} County — {slug.replace('-', ' ').title()}"
@@ -900,7 +967,10 @@ def write_embeds(df):
                 encoding="utf-8",
             )
 
-    print(f"  Wrote {1 + len(COUNTY_ORDER)} KPI embeds + {len(COUNTY_ORDER) * len(SECTION_BUILDERS)} chart embeds to {embeds_dir}")
+    print(
+        f"  Wrote 2 overview embeds + {len(order)} KPI embeds + "
+        f"{len(order) * len(SECTION_BUILDERS)} chart embeds to {embeds_dir}"
+    )
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────

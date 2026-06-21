@@ -1,20 +1,26 @@
 cff-version: 1.2.0
-title: "South Florida Regional Economic Report"
-message: "If you reference this dashboard, please cite it as below."
+title: "Upper Peninsula Regional Economic Report"
+message: "If you reference this dashboard, please cite it as below. It is adapted from Bryan Cutsinger's South Florida Economic Report (MIT)."
 type: software
 authors:
-  - family-names: Cutsinger
-    given-names: Bryan
-    email: bcutsinger@fau.edu
-    affiliation: "Florida Atlantic University"
-    # orcid: "https://orcid.org/0000-0000-0000-0000"
-url: "https://github.com/bryanpcutsinger/south-florida-economic-report"
-repository-code: "https://github.com/bryanpcutsinger/south-florida-economic-report"
+  - family-names: Ingber
+    given-names: Joshua
+    email: joshua.ingber@mail.wvu.edu
+    affiliation: "West Virginia University"
 keywords:
   - economic indicators
   - QCEW
-  - South Florida
+  - Upper Peninsula
+  - Michigan
   - dashboard
 license: MIT
 version: "1.0.0"
-date-released: "2026-05-15"
+references:
+  - type: software
+    title: "South Florida Regional Economic Report"
+    authors:
+      - family-names: Cutsinger
+        given-names: Bryan
+        affiliation: "Florida Atlantic University"
+    url: "https://github.com/bryanpcutsinger/south-florida-economic-report"
+    license: MIT

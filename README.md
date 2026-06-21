@@ -1,27 +1,24 @@
-# South Florida Regional Economic Report
+# Upper Peninsula Regional Economic Report
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Live dashboard](https://img.shields.io/badge/dashboard-live-success)](https://bryanpcutsinger.github.io/south-florida-economic-report/)
 
-An interactive dashboard tracking employment, wages, firm formation, and industry composition across Palm Beach, Broward, and Miami-Dade counties.
-
-**Live dashboard:** https://bryanpcutsinger.github.io/south-florida-economic-report/
+An interactive dashboard tracking employment, wages, firm formation, and industry composition across the 15 counties of Michigan's Upper Peninsula.
 
 ## What it is
 
-A single-page Streamlit + Plotly application that ships in two forms: a fully interactive Streamlit app for local exploration, and a static HTML build published to GitHub Pages. The static build also produces 16 standalone iframe-embeddable pages — the combined regional snapshot, one snapshot per county, and twelve chart pages — that Florida Atlantic University embeds on the FAU website. Data comes from the BLS Quarterly Census of Employment and Wages (QCEW), the Federal Reserve Bank of St. Louis (FRED), and the IRS Statistics of Income migration files.
+A single-page Streamlit + Plotly application that ships in two forms: a fully interactive Streamlit app for local exploration, and a static HTML build publishable to GitHub Pages. The front page is an interactive county map of the Upper Peninsula — hover any county for its latest QCEW snapshot — alongside a comparison of the five largest county economies by employment, business, and wage growth. A county selector drives a per-county deep dive (employment and salary trends, workforce composition, industry landscape, and firm openings/closings).
 
-## Embedding on the FAU website
+Data comes from the BLS Quarterly Census of Employment and Wages (QCEW), the Federal Reserve Bank of St. Louis (FRED), and the IRS Statistics of Income migration files.
 
-The dashboard's charts are published as standalone, self-contained HTML pages designed to be dropped into any page via `<iframe>`. They auto-resize to their content and refresh weekly with no manual action required on the embedding side.
+## Attribution
 
-See [`docs/embeds/README.md`](docs/embeds/README.md) for the full embed URL list, the `<iframe>` snippet, and the postMessage auto-resize listener.
+This project is adapted from Bryan Cutsinger's **South Florida Economic Report** (https://github.com/bryanpcutsinger/south-florida-economic-report), used under the MIT License. The data pipeline, component architecture, and static-build machinery are his; this fork re-geographies the report to the Upper Peninsula, adds the interactive county map and largest-county comparison, and applies Northern Michigan University branding.
 
 ## Quick start (developers)
 
 ```bash
-git clone https://github.com/bryanpcutsinger/south-florida-economic-report.git
-cd south-florida-economic-report
+git clone <this-repo-url>
+cd "Regional Report"
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -29,15 +26,23 @@ export FRED_API_KEY=your_key_here   # optional; without it, FRED-based KPIs rend
 streamlit run app.py
 ```
 
-First load fetches ~3 minutes of QCEW data and caches to `data/cache/`. Subsequent runs load from disk.
+First load fetches the QCEW data for all 15 UP counties and caches to `data/cache/`. Subsequent runs load from disk. The interactive county map fetches the US-counties GeoJSON once and caches it to `data/cache/us_counties.geojson`.
 
-## Building the static embeds
+## Building the static site
 
 ```bash
 python build.py
 ```
 
-This writes `docs/index.html` and the 16 files under `docs/embeds/`. The GitHub Actions workflow at `.github/workflows/update-data.yml` runs this command automatically every Monday at 1:00 AM Eastern and commits the refreshed HTML back to the repo.
+This writes `docs/index.html` plus standalone iframe-embeddable pages under `docs/embeds/`: the interactive county map (`up-map.html`), the largest-county comparison (`up-top-counties.html`), and per-county KPI snapshots and chart pages for the five largest county economies. The GitHub Actions workflow at `.github/workflows/update-data.yml` runs this command on a weekly schedule and commits the refreshed HTML back to the repo.
+
+## Geography
+
+The report covers the 15 counties of Michigan's Upper Peninsula (state FIPS 26): Alger, Baraga, Chippewa, Delta, Dickinson, Gogebic, Houghton, Iron, Keweenaw, Luce, Mackinac, Marquette, Menominee, Ontonagon, and Schoolcraft. BLS suppresses QCEW industry detail for confidentiality in the smallest counties; suppressed cells render as "N/A" on the map and "—" on the KPI cards rather than as zeros.
+
+## Branding
+
+Northern Michigan University palette: NMU Green `#095339` (Pantone 343 C) and NMU Gold `#FFC425` (Pantone 123 C), with brand-compatible neutrals. Colors are defined once in `data/constants.py`.
 
 ## Project layout
 
@@ -45,29 +50,18 @@ This writes `docs/index.html` and the 16 files under `docs/embeds/`. The GitHub 
 app.py            Streamlit application (interactive dashboard)
 build.py          Static HTML generator (produces docs/index.html + docs/embeds/*)
 data/             QCEW, FRED, and IRS SOI fetch + clean + analysis modules
-components/       Plotly chart builders (one per dashboard section)
+components/       Plotly chart builders (county_map, top_counties, + per-county sections)
 utils/            Number formatting + narrative text helpers
-docs/             Published GitHub Pages output (frozen URLs — embedded by FAU)
-audits/           Point-in-time data validation reports
+docs/             Published GitHub Pages output
 .github/workflows Weekly auto-refresh workflow
 ```
-
-Internal architecture details live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Planned improvements and future ideas live in [`docs/ROADMAP.md`](docs/ROADMAP.md).
-
-## Data refresh schedule
-
-Every Monday at 1:00 AM Eastern, the GitHub Action regenerates all HTML files from fresh BLS QCEW, FRED, and IRS SOI data and commits the result. GitHub Pages serves the updated versions within ~10 minutes. If FRED is temporarily rate-limited or unavailable during a rebuild, the build aborts rather than commit, preserving the previously published Real GDP and Unemployment KPI values instead of blanking them.
 
 ## Data sources
 
 - **U.S. Bureau of Labor Statistics**, Quarterly Census of Employment and Wages (QCEW). https://www.bls.gov/cew/
-- **Federal Reserve Bank of St. Louis**, FRED economic data — county real GDP and unemployment rate series. https://fred.stlouisfed.org/
+- **Federal Reserve Bank of St. Louis**, FRED economic data — county real GDP (`REALGDPALL{fips}`) and unemployment rate (`LAUCN{fips}0000000003`) series. https://fred.stlouisfed.org/
 - **Internal Revenue Service**, Statistics of Income (SOI) county-to-county migration data. https://www.irs.gov/statistics/soi-tax-stats-migration-data
-
-## Author
-
-Bryan Cutsinger, Florida Atlantic University — bcutsinger@fau.edu
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](LICENSE). Original work © Bryan Cutsinger; see Attribution above.

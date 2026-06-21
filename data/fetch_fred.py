@@ -91,9 +91,14 @@ def _fetch_series_set(series_map: dict[str, str], api_key: str) -> pd.DataFrame:
     """Fetch all county series in long-format (county_name, date, value).
 
     Each series is retried with backoff (see _fetch_one), and consecutive
-    requests are spaced out to stay under FRED's burst rate limit. Returns an
-    empty DataFrame if ANY county fails, so we never persist a partial cache
-    that would silently drop counties on subsequent loads.
+    requests are spaced out to stay under FRED's burst rate limit.
+
+    Per-county tolerant: a county whose series is missing or fails is simply
+    skipped, and the rest are still returned. This matters for the Upper
+    Peninsula, where a small county may lack a published real-GDP or LAUS
+    series on FRED — one missing series shouldn't blank out the metric for the
+    other fourteen. Returns an empty DataFrame only if EVERY county fails (so
+    we never persist an all-empty cache).
     """
     frames = []
     for i, (county, sid) in enumerate(series_map.items()):
@@ -101,11 +106,11 @@ def _fetch_series_set(series_map: dict[str, str], api_key: str) -> pd.DataFrame:
             time.sleep(_INTER_REQUEST_GAP)
         df = _fetch_one(sid, api_key)
         if df.empty:
-            return pd.DataFrame()  # don't persist a partial set
+            continue  # skip just this county; keep the rest
         df["county_name"] = county
         df["series_id"] = sid
         frames.append(df)
-    return pd.concat(frames, ignore_index=True)
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
 def _fred_api_key() -> str:
@@ -118,7 +123,7 @@ def fred_key_configured() -> bool:
 
 
 def fetch_real_gdp() -> pd.DataFrame:
-    """Cached fetch of annual real GDP for the 3 counties.
+    """Cached fetch of annual real GDP for the UP counties.
 
     Returns an empty DataFrame if no cache and no API key is set.
     """
@@ -135,7 +140,7 @@ def fetch_real_gdp() -> pd.DataFrame:
 
 
 def fetch_unemployment_rate() -> pd.DataFrame:
-    """Cached fetch of monthly unemployment rate (NSA) for the 3 counties.
+    """Cached fetch of monthly unemployment rate (NSA) for the UP counties.
 
     Returns an empty DataFrame if no cache and no API key is set.
     """

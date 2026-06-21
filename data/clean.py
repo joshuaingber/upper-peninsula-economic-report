@@ -107,6 +107,43 @@ def get_latest_quarter(df: pd.DataFrame) -> pd.DataFrame:
     return df[df["date"] == max_date]
 
 
+def latest_county_summaries(df: pd.DataFrame) -> pd.DataFrame:
+    """One row per county summarizing its latest-quarter total-covered QCEW.
+
+    Each county is reduced to the most recent quarter for which it has a
+    total-covered (own_code=0, agglvl=70) row. Returns columns:
+    county_name, area_fips, year, qtr, employment, qtrly_estabs,
+    avg_annual_wage, oty_emp_pct, oty_estab_pct, oty_wage_pct, is_suppressed.
+
+    Counties with no total-covered data are omitted. Shared by the Upper
+    Peninsula county map and the top-counties growth chart.
+    """
+    totals = get_total_covered(df)
+    if totals.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for name, sub in totals.groupby("county_name"):
+        latest = get_latest_quarter(sub)
+        if latest.empty:
+            continue
+        r = latest.iloc[0]
+        rows.append({
+            "county_name": name,
+            "area_fips": str(r.get("area_fips", "")),
+            "year": int(r["year"]),
+            "qtr": int(r["qtr"]),
+            "employment": r["employment"],
+            "qtrly_estabs": r["qtrly_estabs"],
+            "avg_annual_wage": r["avg_annual_wage"],
+            "oty_emp_pct": r.get("oty_month3_emplvl_pct_chg"),
+            "oty_estab_pct": r.get("oty_qtrly_estabs_pct_chg"),
+            "oty_wage_pct": r.get("oty_avg_wkly_wage_pct_chg"),
+            "is_suppressed": bool(r.get("is_suppressed", False)),
+        })
+    return pd.DataFrame(rows)
+
+
 def get_growth_quadrant_data(df: pd.DataFrame) -> pd.DataFrame:
     """Latest-quarter NAICS sectors with valid YoY employment + wage growth rates."""
     sectors = get_latest_quarter(get_naics_sectors(df, own_code=5))

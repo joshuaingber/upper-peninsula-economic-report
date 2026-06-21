@@ -1,7 +1,10 @@
 """
-South Florida Regional Economic Report
+Upper Peninsula Regional Economic Report
 Built with Streamlit + Plotly using BLS QCEW data.
-Covers Palm Beach, Broward, and Miami-Dade counties.
+Covers the 15 counties of Michigan's Upper Peninsula.
+
+Adapted from Bryan Cutsinger's South Florida Economic Report
+(https://github.com/bryanpcutsinger/south-florida-economic-report, MIT).
 """
 import streamlit as st
 import pandas as pd
@@ -13,10 +16,15 @@ from data.clean import (
     clean, get_total_covered, get_latest_quarter,
     latest_gdp_with_growth, latest_unrate_with_yoy, latest_irs_net,
 )
-from data.constants import FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_GRAY, FAU_ELECTRIC_BLUE, FAU_SKY_BLUE, COUNTY_COLORS
+from data.constants import (
+    FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_GRAY, FAU_ELECTRIC_BLUE,
+    FAU_SKY_BLUE, COUNTY_COLORS, COUNTIES,
+)
 from utils.formatting import fmt_number, fmt_currency
 from utils.narratives import source_citation
 
+from components.county_map import render as render_county_map
+from components.top_counties import render as render_top_counties
 from components.employment_trends import render as render_trends
 from components.growth_quadrant import render as render_growth_quadrant
 from components.firm_formation import render as render_firm_formation
@@ -24,12 +32,12 @@ from components.employment_treemap import render as render_employment_treemap
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="South Florida Regional Economic Report",
+    page_title="Upper Peninsula Regional Economic Report",
     page_icon=":chart_with_upwards_trend:",
     layout="wide",
 )
 
-# ── FAU Theme CSS ─────────────────────────────────────────────────────────────
+# ── NMU Theme CSS ─────────────────────────────────────────────────────────────
 st.markdown(f"""
 <style>
     /* White background throughout */
@@ -159,8 +167,8 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── Title ─────────────────────────────────────────────────────────────────────
-st.markdown('<p class="main-title">South Florida Regional Economic Report</p>', unsafe_allow_html=True)
-st.markdown('<p class="main-subtitle">Quarterly Census of Employment and Wages (QCEW) &mdash; Palm Beach, Broward &amp; Miami-Dade Counties</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">Upper Peninsula Regional Economic Report</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-subtitle">Quarterly Census of Employment and Wages (QCEW) &mdash; the 15 counties of Michigan&rsquo;s Upper Peninsula</p>', unsafe_allow_html=True)
 
 # ── Load and clean data ──────────────────────────────────────────────────────
 raw_df = fetch_all_data()
@@ -312,26 +320,14 @@ if not sample_latest.empty:
     sample_row = sample_latest.iloc[0]
     st.markdown(f'<div class="data-badge">Data as of {int(sample_row["year"])} Q{int(sample_row["qtr"])}</div>', unsafe_allow_html=True)
 
-st.markdown("### Regional Snapshot")
+# ── Regional Snapshot: interactive map + largest-county comparison ────────────
+render_county_map(df)
 
-# 3 columns — one card per county
-county_order = ["Palm Beach", "Broward", "Miami-Dade"]
-cols = st.columns(3)
-for col, county_name in zip(cols, county_order):
-    with col:
-        county_df = df[df["county_name"] == county_name]
-        color = COUNTY_COLORS.get(county_name, FAU_BLUE)
-        _county_snapshot_card(county_df, county_name, color, _secondary_for(county_name))
+st.divider()
 
-st.caption(
-    "Net Migration reflects IRS SOI county-to-county filings (Total Migration-US "
-    "and Foreign) — the net change in tax-filer exemptions between consecutive "
-    "filing years, inclusive of moves into and out of the country. FRED real GDP "
-    "and unemployment rate vintages reflect the most recent BEA/BLS releases as "
-    "of the data badge above."
-)
+render_top_counties(df)
 
-# ── County Tabs ───────────────────────────────────────────────────────────────
+# ── County Detail (selectable) ────────────────────────────────────────────────
 
 def _render_county_tab(county_df: pd.DataFrame, county_name: str):
     """Render the full QCEW analysis for a single county."""
@@ -357,20 +353,33 @@ def _render_county_tab(county_df: pd.DataFrame, county_name: str):
 
 st.divider()
 
-tab_palm, tab_broward, tab_miami = st.tabs([
-    "Palm Beach County",
-    "Broward County",
-    "Miami-Dade County",
-])
+st.markdown("### County Detail")
 
-with tab_palm:
-    _render_county_tab(df[df["county_name"] == "Palm Beach"], "Palm Beach")
+# Fifteen counties don't fit a tab strip, so a selector drives the per-county
+# deep dive. Counties are ordered geographically (west → east) via COUNTIES;
+# default to Marquette, the UP's largest economy.
+county_names = list(COUNTIES.values())
+default_idx = county_names.index("Marquette") if "Marquette" in county_names else 0
+selected_county = st.selectbox(
+    "Select a county", county_names, index=default_idx,
+    label_visibility="collapsed",
+)
 
-with tab_broward:
-    _render_county_tab(df[df["county_name"] == "Broward"], "Broward")
+selected_df = df[df["county_name"] == selected_county]
+selected_color = COUNTY_COLORS.get(selected_county, FAU_BLUE)
+_county_snapshot_card(
+    selected_df, selected_county, selected_color, _secondary_for(selected_county)
+)
+st.caption(
+    "Net Migration reflects IRS SOI county-to-county filings (Total Migration-US "
+    "and Foreign) — the net change in tax-filer exemptions between consecutive "
+    "filing years, inclusive of moves into and out of the country. FRED real GDP "
+    "and unemployment rate vintages reflect the most recent BEA/BLS releases as "
+    "of the data badge above. Small UP counties may show '—' where BLS/BEA/IRS "
+    "suppress or omit a series for confidentiality."
+)
 
-with tab_miami:
-    _render_county_tab(df[df["county_name"] == "Miami-Dade"], "Miami-Dade")
+_render_county_tab(selected_df, selected_county)
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
