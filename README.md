@@ -1,8 +1,11 @@
 # Upper Peninsula Regional Economic Report
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Live dashboard](https://img.shields.io/badge/dashboard-live-success)](https://joshuaingber.github.io/upper-peninsula-economic-report/)
 
 An interactive dashboard tracking employment, wages, firm formation, and industry composition across the 15 counties of Michigan's Upper Peninsula.
+
+**Live dashboard:** https://joshuaingber.github.io/upper-peninsula-economic-report/
 
 ## What it is
 
