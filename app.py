@@ -19,6 +19,7 @@ from data.clean import (
 from data.constants import (
     FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_GRAY, FAU_ELECTRIC_BLUE,
     FAU_SKY_BLUE, COUNTY_COLORS, COUNTIES,
+    NMU_FONT_FAMILY, GOOGLE_FONTS_IMPORT,
 )
 from utils.formatting import fmt_number, fmt_currency
 from utils.narratives import source_citation
@@ -40,6 +41,16 @@ st.set_page_config(
 # ── NMU Theme CSS ─────────────────────────────────────────────────────────────
 st.markdown(f"""
 <style>
+    {GOOGLE_FONTS_IMPORT}
+
+    /* NMU typography: match nmu.edu (Figtree) across the app, including
+       Streamlit's own widget text and headings. */
+    html, body, .stApp, [class*="css"],
+    .stMarkdown, .stMetric, .stCaption, p, span, label, div,
+    h1, h2, h3, h4, h5, h6, button, input, select {{
+        font-family: {NMU_FONT_FAMILY};
+    }}
+
     /* White background throughout */
     .stApp {{
         background-color: #FFFFFF;

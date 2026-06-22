@@ -49,15 +49,30 @@ STATE_FIPS = "26"
 #   NMU Gold   #FFC425  (Pantone 123 C)
 # Supporting neutrals/accents are brand-compatible derivations; a true semantic
 # red is retained for "negative" deltas regardless of brand (lower-is-worse).
-NMU_GREEN = "#095339"
-NMU_GOLD = "#FFC425"
+NMU_GREEN = "#095339"   # Pantone 343 C
+NMU_GOLD = "#FFC425"    # Pantone 123 C
+NMU_RED = "#C41230"     # official NMU/Wildcats red
 NMU_LIGHT_GREEN = "#3F7E5E"
 NMU_DARK_GRAY = "#3D3D3D"
 NMU_GRAY = "#CCCCCC"
 NMU_STONE = "#7E8C84"
 NMU_PALE_GREEN = "#E3EFE8"
 NMU_SAND = "#D4B98B"
-SEMANTIC_RED = "#C8102E"
+# Negative-delta red is the official NMU red so the whole report stays on-palette.
+SEMANTIC_RED = NMU_RED
+
+# ── Typography ───────────────────────────────────────────────────────────────
+# nmu.edu's primary web font is Figtree (free on Google Fonts), with the same
+# Helvetica/Arial fallback stack the NMU theme uses. Cera Pro / dharma-gothic
+# (their display faces) are Adobe Typekit-only and not freely embeddable, so
+# Figtree is the closest embeddable match to the live site.
+NMU_FONT_FAMILY = '"Figtree", Helvetica, Tahoma, Verdana, Arial, sans-serif'
+PLOTLY_FONT = "Figtree, Helvetica, Arial, sans-serif"
+GOOGLE_FONTS_IMPORT = (
+    "@import url('https://fonts.googleapis.com/css2?"
+    "family=Figtree:wght@400;500;600;700;900&family=EB+Garamond&"
+    "family=Roboto+Condensed:wght@400;700&display=swap');"
+)
 
 # Backward-compatible aliases. The components import these `FAU_*` names; rather
 # than rename every import, we re-point the names at the NMU palette so the whole
@@ -83,11 +98,13 @@ COUNTY_COLORS = {
     for i, name in enumerate(COUNTIES.values())
 }
 
-# Diverging color scale for the choropleth map (OTY employment % change):
-# red (decline) → pale → NMU green (growth).
+# Diverging color scale for the choropleth map (OTY employment % change),
+# built from the three NMU brand colors so hovering across counties sweeps
+# through NMU shades: NMU red (decline) → NMU gold (≈flat, the zmid) →
+# NMU green (growth).
 MAP_DIVERGING_SCALE = [
-    [0.0, SEMANTIC_RED],
-    [0.5, NMU_PALE_GREEN],
+    [0.0, NMU_RED],
+    [0.5, NMU_GOLD],
     [1.0, NMU_GREEN],
 ]
 

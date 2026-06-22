@@ -16,6 +16,7 @@ import pandas as pd
 from data.clean import get_treemap_snapshots
 from data.constants import (
     INDUSTRY_DOMAIN_COLORS, FAU_DARK_GRAY, FAU_GRAY, FAU_STONE, FAU_SAND,
+    PLOTLY_FONT,
 )
 from utils.narratives import source_citation, format_industry_list
 
@@ -62,7 +63,7 @@ def build_figure(snapshots: list) -> go.Figure:
             textinfo="label+value",
             texttemplate="<b>%{label}</b><br>%{value:,.0f} (%{customdata[0]:.1%})",
             textfont=dict(
-                family="Source Sans Pro, sans-serif",
+                family=PLOTLY_FONT,
                 size=12,
                 color=text_colors,
             ),
@@ -94,6 +95,7 @@ def build_figure(snapshots: list) -> go.Figure:
     fig.update_layout(
         plot_bgcolor="white",
         paper_bgcolor="white",
+        font=dict(family=PLOTLY_FONT),
         height=560,
         margin=dict(t=30, b=70, l=10, r=10),
         updatemenus=[dict(

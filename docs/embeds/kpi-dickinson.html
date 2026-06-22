@@ -6,11 +6,11 @@
 <title>Dickinson County — KPI Snapshot</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
-
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;900&family=EB+Garamond&family=Roboto+Condensed:wght@400;700&display=swap');
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: "Figtree", Helvetica, Tahoma, Verdana, Arial, sans-serif;
     background-color: #FFFFFF;
     color: #3D3D3D;
     line-height: 1.6;
@@ -45,7 +45,7 @@ h1, h2, h3, h4 { color: #095339; }
 .kpi-value { font-size: 1.4rem; font-weight: 700; color: #095339; }
 .kpi-delta { font-size: 0.8rem; margin-top: 0.1rem; }
 .kpi-delta.positive { color: #2E7D32; }
-.kpi-delta.negative { color: #C8102E; }
+.kpi-delta.negative { color: #C41230; }
 .kpi-row.secondary {
     margin-top: 0.9rem;
     padding-top: 0.7rem;
@@ -83,7 +83,7 @@ h1, h2, h3, h4 { color: #095339; }
 </style>
 </head>
 <body>
-<h3 style="color: #095339; margin-bottom: 0.5rem;">Dickinson County Snapshot</h3><div class="snapshot-row single-county"><div class="county-card" style="border-left-color: #C8102E;"><h3 style="color: #C8102E;">Dickinson County</h3><div class="kpi-row"><div class="kpi-item"><div class="kpi-label">Employment</div><div class="kpi-value">13,600</div><div class="kpi-delta negative">&#9660; 0.6% YoY</div></div><div class="kpi-item"><div class="kpi-label">Establishments</div><div class="kpi-value">861</div><div class="kpi-delta positive">&#9650; 2.3% YoY</div></div><div class="kpi-item"><div class="kpi-label">Average Salary</div><div class="kpi-value">$63,752</div><div class="kpi-delta positive">&#9650; 6.9% YoY</div></div></div><div class="kpi-row secondary"><div class="kpi-item"><div class="kpi-label">Real GDP</div><div class="kpi-value">$1.3B</div><div class="kpi-delta negative">&#9660; 0.1% YoY</div><div class="kpi-period">(2024)</div></div><div class="kpi-item"><div class="kpi-label">Unemployment rate</div><div class="kpi-value">4.4%</div><div class="kpi-delta positive">&#9660; 0.9pp YoY</div><div class="kpi-period">(Apr 2026)</div></div><div class="kpi-item"><div class="kpi-label">Net Migration</div><div class="kpi-value">+57</div><div class="kpi-period">(2022→2023 filings, US + foreign)</div></div></div></div></div><p class="kpi-caption">Net Migration reflects IRS SOI county-to-county filings (Total Migration-US and Foreign) — the net change in tax-filer exemptions between consecutive filing years, inclusive of moves into and out of the country. FRED real GDP and unemployment rate vintages reflect the most recent BEA/BLS releases as of the data badge above.</p>
+<h3 style="color: #095339; margin-bottom: 0.5rem;">Dickinson County Snapshot</h3><div class="snapshot-row single-county"><div class="county-card" style="border-left-color: #C41230;"><h3 style="color: #C41230;">Dickinson County</h3><div class="kpi-row"><div class="kpi-item"><div class="kpi-label">Employment</div><div class="kpi-value">13,600</div><div class="kpi-delta negative">&#9660; 0.6% YoY</div></div><div class="kpi-item"><div class="kpi-label">Establishments</div><div class="kpi-value">861</div><div class="kpi-delta positive">&#9650; 2.3% YoY</div></div><div class="kpi-item"><div class="kpi-label">Average Salary</div><div class="kpi-value">$63,752</div><div class="kpi-delta positive">&#9650; 6.9% YoY</div></div></div><div class="kpi-row secondary"><div class="kpi-item"><div class="kpi-label">Real GDP</div><div class="kpi-value">$1.3B</div><div class="kpi-delta negative">&#9660; 0.1% YoY</div><div class="kpi-period">(2024)</div></div><div class="kpi-item"><div class="kpi-label">Unemployment rate</div><div class="kpi-value">4.4%</div><div class="kpi-delta positive">&#9660; 0.9pp YoY</div><div class="kpi-period">(Apr 2026)</div></div><div class="kpi-item"><div class="kpi-label">Net Migration</div><div class="kpi-value">+57</div><div class="kpi-period">(2022→2023 filings, US + foreign)</div></div></div></div></div><p class="kpi-caption">Net Migration reflects IRS SOI county-to-county filings (Total Migration-US and Foreign) — the net change in tax-filer exemptions between consecutive filing years, inclusive of moves into and out of the country. FRED real GDP and unemployment rate vintages reflect the most recent BEA/BLS releases as of the data badge above.</p>
 <script>
 var figureData = {};
 

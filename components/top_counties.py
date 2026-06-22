@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import pandas as pd
 
 from data.clean import latest_county_summaries
-from data.constants import NMU_GREEN, NMU_GOLD, NMU_STONE, NMU_GRAY
+from data.constants import NMU_GREEN, NMU_GOLD, NMU_STONE, NMU_GRAY, PLOTLY_FONT
 from utils.narratives import source_citation, format_industry_list
 
 
@@ -65,6 +65,7 @@ def build_figure(top: pd.DataFrame) -> go.Figure:
         bargroupgap=0.08,
         plot_bgcolor="white",
         paper_bgcolor="white",
+        font=dict(family=PLOTLY_FONT),
         height=460,
         margin=dict(t=30, b=80, l=70, r=20),
         hovermode="x unified",

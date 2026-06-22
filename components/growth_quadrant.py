@@ -13,6 +13,7 @@ import pandas as pd
 from data.clean import get_growth_quadrant_data
 from data.constants import (
     INDUSTRY_DOMAIN_COLORS, FAU_DARK_GRAY, FAU_GRAY, FAU_STONE, FAU_SKY_BLUE,
+    PLOTLY_FONT,
 )
 from utils.narratives import source_citation, format_industry_list
 
@@ -102,13 +103,13 @@ def build_figure(plot_data: pd.DataFrame) -> go.Figure:
             x=x_p, y=y_p, xref="paper", yref="paper",
             text=txt, showarrow=False,
             xanchor=xa, yanchor=ya,
-            font=dict(size=9, color=FAU_DARK_GRAY,
-                      family="Source Sans Pro, sans-serif"),
+            font=dict(size=9, color=FAU_DARK_GRAY, family=PLOTLY_FONT),
         )
 
     fig.update_layout(
         plot_bgcolor="white",
         paper_bgcolor="white",
+        font=dict(family=PLOTLY_FONT),
         height=550,
         margin=dict(t=30, b=70, l=80, r=30),
         xaxis=dict(

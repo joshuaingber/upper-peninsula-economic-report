@@ -13,6 +13,7 @@ import pandas as pd
 from data.clean import get_firm_formation_data, get_national_qoq_pct
 from data.constants import (
     FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_SAND, AGGLVL_TOTAL_BY_OWN,
+    PLOTLY_FONT,
 )
 from data.fetch import fetch_national_data
 from utils.narratives import source_citation
@@ -89,6 +90,7 @@ def build_figure(
     fig.update_layout(
         plot_bgcolor="white",
         paper_bgcolor="white",
+        font=dict(family=PLOTLY_FONT),
         height=460,
         margin=dict(t=40, b=210, l=70, r=20),
         barmode="relative",

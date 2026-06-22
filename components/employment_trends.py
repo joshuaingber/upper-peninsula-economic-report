@@ -8,7 +8,7 @@ import pandas as pd
 
 from data.analysis import deseasonalize_trend, project_trend, periods_to_current_quarter
 from data.clean import get_total_covered
-from data.constants import COUNTY_COLORS, FAU_BLUE, FAU_SKY_BLUE
+from data.constants import COUNTY_COLORS, FAU_BLUE, FAU_SKY_BLUE, PLOTLY_FONT
 from utils.formatting import fmt_currency
 from utils.narratives import narrate_employment_trends, source_citation
 
@@ -97,6 +97,7 @@ def _build_chart(
         )
     fig.update_layout(
         title=dict(text=title, font=dict(size=14)),
+        font=dict(family=PLOTLY_FONT),
         plot_bgcolor="white",
         paper_bgcolor="white",
         hovermode="x unified",

@@ -18,7 +18,7 @@ import pandas as pd
 import requests
 
 from data.clean import latest_county_summaries
-from data.constants import COUNTIES, MAP_DIVERGING_SCALE
+from data.constants import COUNTIES, MAP_DIVERGING_SCALE, PLOTLY_FONT
 from utils.formatting import fmt_number, fmt_currency
 from utils.narratives import source_citation
 
@@ -146,6 +146,7 @@ def build_figure(summary: pd.DataFrame, geojson: dict) -> go.Figure:
         paper_bgcolor="white",
         geo=dict(bgcolor="white"),
         dragmode=False,
+        font=dict(family=PLOTLY_FONT),
     )
     return fig
 

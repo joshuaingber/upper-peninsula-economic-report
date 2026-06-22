@@ -32,6 +32,7 @@ GROWTH_QUADRANT_NOTE = f'<p class="source"><em>{_GROWTH_QUADRANT_TEXT}</em></p>'
 from data.constants import (
     FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_GRAY,
     FAU_ELECTRIC_BLUE, FAU_SKY_BLUE, COUNTY_COLORS, COUNTIES,
+    NMU_FONT_FAMILY, GOOGLE_FONTS_IMPORT, PLOTLY_FONT,
 )
 from utils.formatting import fmt_number, fmt_currency, fmt_pct
 from utils.narratives import narrate_employment_trends, format_industry_list
@@ -56,11 +57,11 @@ def _detail_counties(df) -> list[str]:
 
 # ── CSS ──────────────────────────────────────────────────────────────────────
 
-CSS = """
+CSS = GOOGLE_FONTS_IMPORT + """
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: """ + NMU_FONT_FAMILY + """;
     background-color: #FFFFFF;
     color: """ + FAU_DARK_GRAY + """;
     line-height: 1.6;
@@ -209,11 +210,11 @@ Object.keys(figureData).forEach(function(divId) {
 # embed fills the iframe width rather than the desktop 1200px cap. Includes a
 # media query so the KPI embed stacks its 3 county cards vertically below 768px.
 
-EMBED_CSS = """
+EMBED_CSS = GOOGLE_FONTS_IMPORT + """
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: """ + NMU_FONT_FAMILY + """;
     background-color: #FFFFFF;
     color: """ + FAU_DARK_GRAY + """;
     line-height: 1.6;
@@ -519,6 +520,7 @@ def _trends_chart(totals, y_col, title, color, tickformat, hover_prefix, log_tra
 
     fig.update_layout(
         title=dict(text=title, font=dict(size=14)),
+        font=dict(family=PLOTLY_FONT),
         plot_bgcolor="white", paper_bgcolor="white",
         hovermode="x unified", height=440,
         margin=dict(t=50, b=90, l=100, r=20),
