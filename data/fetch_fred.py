@@ -15,6 +15,7 @@ from __future__ import annotations
 import io
 import os
 import time
+from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
@@ -57,8 +58,8 @@ def _fred_observations(series_id: str, api_key: str) -> pd.DataFrame:
 # FRED enforces a burst rate limit (nominally 120 req/min, but it 429s much
 # tighter rapid bursts). We fetch only a handful of series, so a small fixed
 # gap between requests plus exponential backoff on a 429 keeps us under it.
-_INTER_REQUEST_GAP = 0.6   # seconds between consecutive series requests
-_MAX_ATTEMPTS = 5          # per-series tries before giving up
+_INTER_REQUEST_GAP = 1.0   # seconds between consecutive series requests
+_MAX_ATTEMPTS = 6          # per-series tries before giving up
 _BACKOFF_BASE = 1.0        # seconds; doubles each retry
 
 
@@ -131,35 +132,51 @@ def fred_key_configured() -> bool:
     return bool(_fred_api_key())
 
 
+def _fetch_with_cache_fallback(
+    series_map: dict[str, str], cache_path: Path
+) -> pd.DataFrame:
+    """Fetch fresh from FRED, falling back to the last-good cache on failure.
+
+    The cache is a *fallback*, not a short-circuit: with a key set we always
+    try a fresh fetch first, so the dashboard keeps tracking FRED. Only if that
+    fetch comes back empty (a sustained rate-limit or FRED outage — see
+    _fetch_series_set, which already tolerates individual-county failures) do we
+    fall back to the committed last-good cache. This decouples the FRED KPI row
+    from the QCEW build: a FRED hiccup leaves last week's KPIs in place instead
+    of blanking them or aborting the whole publish. Fresh fetches overwrite the
+    cache, so the fallback stays current between outages.
+
+    Without a key (local/no-key runs) we serve the cache if present, else empty
+    (the secondary KPI row then degrades to "—").
+    """
+    api_key = _fred_api_key()
+    if api_key:
+        df = _fetch_series_set(series_map, api_key)
+        if not df.empty:
+            CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            df.to_parquet(cache_path, index=False)
+            return df
+        # Fresh fetch failed; fall through to the last-good cache below.
+    if cache_path.exists():
+        return pd.read_parquet(cache_path)
+    return pd.DataFrame()
+
+
+@lru_cache(maxsize=1)
 def fetch_real_gdp() -> pd.DataFrame:
-    """Cached fetch of annual real GDP for the UP counties.
+    """Annual real GDP for the UP counties — fresh from FRED, cache as fallback.
 
-    Returns an empty DataFrame if no cache and no API key is set.
+    Memoized per process so build.py's several call sites fetch once. Returns an
+    empty DataFrame only when both the fetch and the fallback cache are absent.
     """
-    if GDP_CACHE.exists():
-        return pd.read_parquet(GDP_CACHE)
-    api_key = _fred_api_key()
-    if not api_key:
-        return pd.DataFrame()
-    df = _fetch_series_set(FRED_GDP_SERIES, api_key)
-    if not df.empty:
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(GDP_CACHE, index=False)
-    return df
+    return _fetch_with_cache_fallback(FRED_GDP_SERIES, GDP_CACHE)
 
 
+@lru_cache(maxsize=1)
 def fetch_unemployment_rate() -> pd.DataFrame:
-    """Cached fetch of monthly unemployment rate (NSA) for the UP counties.
+    """Monthly unemployment rate (NSA) for the UP counties — fresh, cache fallback.
 
-    Returns an empty DataFrame if no cache and no API key is set.
+    Memoized per process so build.py's several call sites fetch once. Returns an
+    empty DataFrame only when both the fetch and the fallback cache are absent.
     """
-    if UNRATE_CACHE.exists():
-        return pd.read_parquet(UNRATE_CACHE)
-    api_key = _fred_api_key()
-    if not api_key:
-        return pd.DataFrame()
-    df = _fetch_series_set(FRED_UNRATE_SERIES, api_key)
-    if not df.empty:
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(UNRATE_CACHE, index=False)
-    return df
+    return _fetch_with_cache_fallback(FRED_UNRATE_SERIES, UNRATE_CACHE)

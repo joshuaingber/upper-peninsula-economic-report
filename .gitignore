@@ -9,5 +9,9 @@ venv/
 dist/
 build/
 .DS_Store
-data/cache/
+# Ignore the large/derived caches, but commit the small FRED parquets so CI has
+# a last-good fallback when a fresh FRED fetch fails (see data/fetch_fred.py).
+data/cache/*
+!data/cache/qcew_fred_gdp.parquet
+!data/cache/qcew_fred_unrate.parquet
 scratch/

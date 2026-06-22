@@ -35,4 +35,6 @@ jobs:
           commit_message: 'Update dashboard data'
           # Bare 'docs' (no glob) so git add recurses into docs/embeds/<county>/.
           # The 'docs/*' glob would only match top-level files and silently skip embeds.
-          file_pattern: docs
+          # Also commit the two FRED caches so each successful run refreshes the
+          # last-good fallback used when a later fetch fails (see data/fetch_fred.py).
+          file_pattern: docs data/cache/qcew_fred_gdp.parquet data/cache/qcew_fred_unrate.parquet
