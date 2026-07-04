@@ -61,6 +61,17 @@ NMU_SAND = "#D4B98B"
 # Negative-delta red is the official NMU red so the whole report stays on-palette.
 SEMANTIC_RED = NMU_RED
 
+# ── Accessible-contrast tokens (WCAG 2.1 AA) ─────────────────────────────────
+# Brand hues that fail contrast on white are replaced, in text/UI/data-bearing
+# roles, by these tokens. Bright NMU_GOLD (~1.5:1 on white) is kept only for
+# decorative fills (e.g. the projected-quarter shading), never for text or thin
+# data marks. Ratios are against #FFFFFF.
+NMU_LINK = NMU_GREEN        # ~9.5:1 — link text (also underlined, never color-only)
+NMU_MUTED = "#595959"       # ~7:1  — captions, periods, sources, footer
+NMU_BORDER = "#767676"      # ~4.5:1 — structural UI borders and focus rings
+NMU_GOLD_DARK = "#B8860B"   # ~3.3:1 — gold in data-bearing roles (bars, bubbles)
+NMU_SAND_DARK = "#9C7A3C"   # ~4:1  — sand in data-bearing roles (bubbles)
+
 # ── Typography ───────────────────────────────────────────────────────────────
 # nmu.edu's primary web font is Figtree (free on Google Fonts), with the same
 # Helvetica/Arial fallback stack the NMU theme uses. Cera Pro / dharma-gothic
@@ -89,8 +100,10 @@ FAU_SAND = NMU_SAND
 # Per-county identity colors for the single-county trend charts. Fifteen counties
 # don't get fifteen meaningfully distinct hues, so we cycle a small NMU-derived
 # qualitative set; the map and top-counties charts carry their own color logic.
+# Trend lines are thin marks on white, so each hue must clear WCAG 1.4.11
+# (≥3:1). Bright gold/sand are swapped for their darkened tokens.
 _COUNTY_PALETTE = [
-    NMU_GREEN, NMU_GOLD, NMU_LIGHT_GREEN, NMU_STONE, NMU_SAND,
+    NMU_GREEN, NMU_GOLD_DARK, NMU_LIGHT_GREEN, NMU_STONE, NMU_SAND_DARK,
     NMU_DARK_GRAY, SEMANTIC_RED,
 ]
 COUNTY_COLORS = {
@@ -109,7 +122,10 @@ MAP_DIVERGING_SCALE = [
 ]
 
 # Industry → NMU palette color, grouped by broad domain. Used by the Growth
-# Quadrant chart, which colors bubbles by domain rather than by county.
+# Quadrant chart, which colors bubbles by domain rather than by county. Bubbles
+# are filled marks on white, so every color here clears WCAG 1.4.11 non-text
+# contrast (≥3:1): the bright gold/sand hues are swapped for their darkened
+# tokens (NMU_GOLD_DARK / NMU_SAND_DARK).
 INDUSTRY_DOMAIN_COLORS = {
     # Goods-producing
     "Agriculture":                       FAU_RED,
@@ -118,17 +134,17 @@ INDUSTRY_DOMAIN_COLORS = {
     "Construction":                      FAU_RED,
     "Manufacturing":                     FAU_RED,
     # Trade & Logistics
-    "Wholesale Trade":                   FAU_SAND,
-    "Retail Trade":                      FAU_SAND,
-    "Transportation & Warehousing":      FAU_SAND,
+    "Wholesale Trade":                   NMU_SAND_DARK,
+    "Retail Trade":                      NMU_SAND_DARK,
+    "Transportation & Warehousing":      NMU_SAND_DARK,
     # Information & Finance
     "Information":                       FAU_BLUE,
     "Finance & Insurance":               FAU_BLUE,
     "Real Estate":                       FAU_BLUE,
     # Professional & Business
-    "Professional & Technical Services": FAU_ELECTRIC_BLUE,
-    "Management of Companies":           FAU_ELECTRIC_BLUE,
-    "Admin & Waste Services":            FAU_ELECTRIC_BLUE,
+    "Professional & Technical Services": NMU_GOLD_DARK,
+    "Management of Companies":           NMU_GOLD_DARK,
+    "Admin & Waste Services":            NMU_GOLD_DARK,
     # Education & Health
     "Educational Services":              FAU_STONE,
     "Health Care & Social Assistance":   FAU_STONE,
@@ -137,6 +153,39 @@ INDUSTRY_DOMAIN_COLORS = {
     "Accommodation & Food Services":     FAU_DARK_GRAY,
     "Other Services":                    FAU_DARK_GRAY,
     "Public Administration":             FAU_DARK_GRAY,
+}
+
+# Treemap tiles carry white label text, so each tile color must be dark enough
+# for that text to clear WCAG 1.4.3 (4.5:1 for the 12px labels). This is a
+# darkened, white-text-safe variant of the domain grouping above; hues track
+# INDUSTRY_DOMAIN_COLORS so the two industry charts still read as a set.
+TREEMAP_DOMAIN_COLORS = {
+    # Goods-producing — NMU red (white text ≈5.8:1)
+    "Agriculture":                       NMU_RED,
+    "Mining":                            NMU_RED,
+    "Utilities":                         NMU_RED,
+    "Construction":                      NMU_RED,
+    "Manufacturing":                     NMU_RED,
+    # Trade & Logistics — dark bronze (≈7:1)
+    "Wholesale Trade":                   "#6E5533",
+    "Retail Trade":                      "#6E5533",
+    "Transportation & Warehousing":      "#6E5533",
+    # Information & Finance — NMU green (≈9.5:1)
+    "Information":                       NMU_GREEN,
+    "Finance & Insurance":               NMU_GREEN,
+    "Real Estate":                       NMU_GREEN,
+    # Professional & Business — deep teal-green (≈6:1)
+    "Professional & Technical Services": "#1F6F5C",
+    "Management of Companies":           "#1F6F5C",
+    "Admin & Waste Services":            "#1F6F5C",
+    # Education & Health — dark slate (≈7:1)
+    "Educational Services":              "#4F5A54",
+    "Health Care & Social Assistance":   "#4F5A54",
+    # Leisure & Other — NMU dark gray (≈10:1)
+    "Arts & Entertainment":              NMU_DARK_GRAY,
+    "Accommodation & Food Services":     NMU_DARK_GRAY,
+    "Other Services":                    NMU_DARK_GRAY,
+    "Public Administration":             NMU_DARK_GRAY,
 }
 
 # ── Aggregation levels ────────────────────────────────────────────────────────

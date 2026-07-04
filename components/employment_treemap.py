@@ -15,10 +15,13 @@ import pandas as pd
 
 from data.clean import get_treemap_snapshots
 from data.constants import (
-    INDUSTRY_DOMAIN_COLORS, FAU_DARK_GRAY, FAU_GRAY, FAU_STONE, FAU_SAND,
-    PLOTLY_FONT,
+    TREEMAP_DOMAIN_COLORS, FAU_DARK_GRAY, FAU_GRAY, PLOTLY_FONT,
 )
 from utils.narratives import source_citation, format_industry_list
+
+# Fallback tile color for any unmapped sector — a dark slate that keeps white
+# label text above WCAG 1.4.3 (4.5:1).
+_TREEMAP_FALLBACK = "#4F5A54"
 
 
 METHODOLOGY_NOTE = (
@@ -28,11 +31,6 @@ METHODOLOGY_NOTE = (
     "sectors into broad industry domains (matching the Industry Landscape "
     "chart). Sectors with suppressed BLS data and 'Unclassified' are excluded."
 )
-
-
-def _text_color_for(domain_color: str) -> str:
-    """Pick contrast text color: dark gray on FAU_SAND (light), white otherwise."""
-    return FAU_DARK_GRAY if domain_color == FAU_SAND else "white"
 
 
 def build_figure(snapshots: list) -> go.Figure:
@@ -50,10 +48,9 @@ def build_figure(snapshots: list) -> go.Figure:
 
     for idx, (year, qtr, plot_data) in enumerate(snapshots):
         domain_colors = [
-            INDUSTRY_DOMAIN_COLORS.get(label, FAU_STONE)
+            TREEMAP_DOMAIN_COLORS.get(label, _TREEMAP_FALLBACK)
             for label in plot_data["industry_label"]
         ]
-        text_colors = [_text_color_for(c) for c in domain_colors]
         fig.add_trace(go.Treemap(
             labels=plot_data["industry_label"],
             parents=[""] * len(plot_data),
@@ -65,7 +62,7 @@ def build_figure(snapshots: list) -> go.Figure:
             textfont=dict(
                 family=PLOTLY_FONT,
                 size=12,
-                color=text_colors,
+                color="white",  # every tile color is dark enough for white text (≥4.5:1)
             ),
             hovertemplate=(
                 "<b>%{label}</b><br>"

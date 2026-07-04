@@ -80,16 +80,91 @@ h1, h2, h3, h4 { color: #095339; }
     body { padding: 0.3rem; }
 }
 
+/* ── Accessibility (WCAG 2.1 AA) ─────────────────────────────────────────── */
+.kpi-period, .kpi-caption, .source, .footer { color: #595959; }
+.source a, .footer a { color: #095339; text-decoration: underline; }
+.tab-bar { border-bottom-color: #767676; }
+.kpi-row.secondary { border-top-color: #767676; }
+.kpi-label { line-height: 1.1; }
+
+/* 2.4.7 Focus Visible — a clearly visible keyboard focus indicator (≥3:1). */
+a:focus-visible, button:focus-visible, summary:focus-visible,
+[tabindex]:focus-visible {
+    outline: 3px solid #095339;
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* Screen-reader-only text (visually hidden, still announced). */
+.sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* Each chart is a figure with a visible caption. */
+figure.chart-figure { margin: 0; }
+figure.chart-figure > figcaption { margin-bottom: 0.75rem; }
+
+/* Collapsible data tables — the machine-readable alternative to each chart. */
+.data-table-details { margin: 0.25rem 0 0.75rem; }
+.data-table-details > summary {
+    cursor: pointer; font-size: 0.9rem; font-weight: 600;
+    color: #095339; padding: 0.35rem 0;
+}
+.data-table-details > summary:hover { text-decoration: underline; }
+.table-scroll { overflow-x: auto; }
+table.data-table {
+    border-collapse: collapse; width: 100%;
+    font-size: 0.85rem; margin-top: 0.5rem;
+}
+table.data-table caption {
+    text-align: left; font-size: 0.85rem;
+    color: #595959; padding-bottom: 0.35rem;
+}
+table.data-table th, table.data-table td {
+    border: 1px solid #767676;
+    padding: 0.3rem 0.55rem; text-align: right;
+}
+table.data-table thead th { background: #E3EFE8; color: #095339; }
+table.data-table th[scope="row"] { text-align: left; }
+
+/* Keyboard-operable year selector (treemap) — real buttons, not Plotly SVG. */
+.year-select { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0 0.25rem; }
+.year-select .year-btn {
+    font-family: inherit; font-size: 0.85rem; cursor: pointer;
+    padding: 0.3rem 0.7rem; border: 1px solid #767676;
+    background: #fff; color: #3D3D3D; border-radius: 4px;
+}
+.year-select .year-btn[aria-pressed="true"] {
+    background: #095339; color: #fff; border-color: #095339;
+}
+
 </style>
 </head>
 <body>
-<h3 style="color: #095339; margin-bottom: 0.5rem;">Dickinson County Snapshot</h3><div class="snapshot-row single-county"><div class="county-card" style="border-left-color: #C41230;"><h3 style="color: #C41230;">Dickinson County</h3><div class="kpi-row"><div class="kpi-item"><div class="kpi-label">Employment</div><div class="kpi-value">13,600</div><div class="kpi-delta negative">&#9660; 0.6% YoY</div></div><div class="kpi-item"><div class="kpi-label">Establishments</div><div class="kpi-value">861</div><div class="kpi-delta positive">&#9650; 2.3% YoY</div></div><div class="kpi-item"><div class="kpi-label">Average Salary</div><div class="kpi-value">$63,752</div><div class="kpi-delta positive">&#9650; 6.9% YoY</div></div></div><div class="kpi-row secondary"><div class="kpi-item"><div class="kpi-label">Real GDP</div><div class="kpi-value">$1.3B</div><div class="kpi-delta negative">&#9660; 0.1% YoY</div><div class="kpi-period">(2024)</div></div><div class="kpi-item"><div class="kpi-label">Unemployment rate</div><div class="kpi-value">4.4%</div><div class="kpi-delta positive">&#9660; 0.9pp YoY</div><div class="kpi-period">(Apr 2026)</div></div><div class="kpi-item"><div class="kpi-label">Net Migration</div><div class="kpi-value">+57</div><div class="kpi-period">(2022→2023 filings, US + foreign)</div></div></div></div></div><p class="kpi-caption">Net Migration reflects IRS SOI county-to-county filings (Total Migration-US and Foreign) — the net change in tax-filer exemptions between consecutive filing years, inclusive of moves into and out of the country. FRED real GDP and unemployment rate vintages reflect the most recent BEA/BLS releases as of the data badge above.</p>
+<main>
+<h1 class="sr-only">Dickinson County — KPI Snapshot</h1>
+<h2 style="color: #095339; margin-bottom: 0.5rem;">Dickinson County Snapshot</h2><div class="snapshot-row single-county"><div class="county-card" style="border-left-color: #C41230;"><h3 style="color: #C41230;">Dickinson County</h3><div class="kpi-row"><div class="kpi-item"><div class="kpi-label">Employment</div><div class="kpi-value">13,600</div><div class="kpi-delta negative" aria-label="decreased 0.6 percent year over year">&#9660; 0.6% YoY</div></div><div class="kpi-item"><div class="kpi-label">Establishments</div><div class="kpi-value">861</div><div class="kpi-delta positive" aria-label="increased 2.3 percent year over year">&#9650; 2.3% YoY</div></div><div class="kpi-item"><div class="kpi-label">Average Salary</div><div class="kpi-value">$63,752</div><div class="kpi-delta positive" aria-label="increased 6.9 percent year over year">&#9650; 6.9% YoY</div></div></div><div class="kpi-row secondary"><div class="kpi-item"><div class="kpi-label">Real GDP</div><div class="kpi-value">$1.3B</div><div class="kpi-delta negative" aria-label="decreased 0.1 percent year over year">&#9660; 0.1% YoY</div><div class="kpi-period">(2024)</div></div><div class="kpi-item"><div class="kpi-label">Unemployment rate</div><div class="kpi-value">4.9%</div><div class="kpi-delta positive" aria-label="fell 0.3 percentage points year over year">&#9660; 0.3pp YoY</div><div class="kpi-period">(May 2026)</div></div><div class="kpi-item"><div class="kpi-label">Net Migration</div><div class="kpi-value">+57</div><div class="kpi-period">(2022→2023 filings, US + foreign)</div></div></div></div></div><p class="kpi-caption">Net Migration reflects IRS SOI county-to-county filings (Total Migration-US and Foreign) — the net change in tax-filer exemptions between consecutive filing years, inclusive of moves into and out of the country. FRED real GDP and unemployment rate vintages reflect the most recent BEA/BLS releases as of the data badge above.</p>
+</main>
 <script>
 var figureData = {};
 
+function selectTreemapYear(btn) {
+    var target = btn.getAttribute('data-target');
+    var idx = parseInt(btn.getAttribute('data-trace'), 10);
+    var n = parseInt(btn.getAttribute('data-count'), 10);
+    var vis = [];
+    for (var i = 0; i < n; i++) { vis.push(i === idx); }
+    Plotly.restyle(target, {visible: vis});
+    btn.parentNode.querySelectorAll('.year-btn').forEach(function(b) {
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+    });
+}
+
 Object.keys(figureData).forEach(function(divId) {
     var fig = figureData[divId];
-    Plotly.newPlot(divId, fig.data, fig.layout, {responsive: true});
+    Plotly.newPlot(divId, fig.data, fig.layout, {responsive: true, displayModeBar: false});
 });
 
 (function() {

@@ -15,3 +15,9 @@ data/cache/*
 !data/cache/qcew_fred_gdp.parquet
 !data/cache/qcew_fred_unrate.parquet
 scratch/
+
+# Node / accessibility tooling (pa11y-ci). node_modules is installed on demand;
+# the runtime pa11y config is generated per-run by scripts/a11y.mjs.
+node_modules/
+.npm-cache/
+.pa11yci.runtime.json

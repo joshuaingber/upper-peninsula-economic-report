@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import pandas as pd
 
 from data.clean import latest_county_summaries
-from data.constants import NMU_GREEN, NMU_GOLD, NMU_STONE, NMU_GRAY, PLOTLY_FONT
+from data.constants import NMU_GREEN, NMU_GOLD_DARK, NMU_STONE, NMU_GRAY, PLOTLY_FONT
 from utils.narratives import source_citation, format_industry_list
 
 
@@ -25,7 +25,7 @@ METHODOLOGY_NOTE = (
 
 _METRICS = [
     ("oty_emp_pct", "Employment growth", NMU_GREEN),
-    ("oty_estab_pct", "Business growth", NMU_GOLD),
+    ("oty_estab_pct", "Business growth", NMU_GOLD_DARK),
     ("oty_wage_pct", "Wage growth", NMU_STONE),
 ]
 

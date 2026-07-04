@@ -1,0 +1,38 @@
+name: Accessibility (WCAG 2.1 AA)
+
+# Validates the published pages against WCAG 2.1 Level AA — the standard NMU
+# (and the DOJ 2024 ADA Title II rule) requires. Runs on any change that can
+# affect rendered output, and can be triggered manually. See
+# docs/accessibility/GUIDELINES.md for the binding requirements.
+
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - 'build.py'
+      - 'data/constants.py'
+      - 'components/**'
+      - '.pa11yci'
+      - '.github/workflows/accessibility.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  a11y:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      # Checks the committed docs/ output directly (via scripts/a11y.mjs) — no
+      # data fetch or rebuild, so the gate is fast and never flakes on the
+      # BLS/FRED APIs. Chart internals are exposed to assistive tech as a single
+      # role="img" node, so a CDN hiccup loading Plotly cannot affect the result.
+      - name: Run accessibility check (WCAG 2.1 AA)
+        run: npm run a11y
