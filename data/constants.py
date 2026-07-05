@@ -69,7 +69,9 @@ SEMANTIC_RED = NMU_RED
 NMU_LINK = NMU_GREEN        # ~9.5:1 — link text (also underlined, never color-only)
 NMU_MUTED = "#595959"       # ~7:1  — captions, periods, sources, footer
 NMU_BORDER = "#767676"      # ~4.5:1 — structural UI borders and focus rings
-NMU_GOLD_DARK = "#B8860B"   # ~3.3:1 — gold in data-bearing roles (bars, bubbles)
+NMU_GOLD_DARK = "#8C6608"   # ~5.2:1 — gold in data-bearing roles AND text (Marquette
+                            # county heading), so it clears the 4.5:1 body-text bar at
+                            # any weight, not just the 3:1 large-text/graphical bar
 NMU_SAND_DARK = "#9C7A3C"   # ~4:1  — sand in data-bearing roles (bubbles)
 
 # ── Typography ───────────────────────────────────────────────────────────────

@@ -738,16 +738,19 @@ def _trends_chart(totals, y_col, title, color, tickformat, hover_prefix, log_tra
     return fig
 
 
-def build_trends(county_df, county_name, county_id):
+def build_trends(county_df, county_name, county_id, heading_level=2):
     """Employment & Salary Trends — raw + STL-trend overlays, side by side.
 
     Returns (html_fragment, figures_dict) so the caller can either merge the
     figures into the main dashboard's master dict (index.html path) or write
-    the fragment as a standalone embed page.
+    the fragment as a standalone embed page. ``heading_level`` controls the
+    section heading tag: 2 for standalone embeds (under their sr-only h1), 4
+    for the index detail tabs (under the h3 county name below "County Detail").
     """
+    h, _h = f"h{heading_level}", f"/h{heading_level}"
     totals = get_total_covered(county_df)
     if totals.empty:
-        return '<div class="section"><h2>Employment &amp; Salary Trends</h2><p>No trend data available.</p></div>', {}
+        return f'<div class="section"><{h}>Employment &amp; Salary Trends<{_h}><p>No trend data available.</p></div>', {}
 
     totals = totals.sort_values("date")
     earliest, latest = totals.iloc[0], totals.iloc[-1]
@@ -789,7 +792,7 @@ def build_trends(county_df, county_name, county_id):
     )
 
     html = (
-        f'<div class="section"><h2>Employment &amp; Salary Trends</h2>'
+        f'<div class="section"><{h}>Employment &amp; Salary Trends<{_h}>'
         f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
         f'<div class="chart-row">'
         f'<div class="chart-col">{_chart_div(eid, empl_aria)}</div>'
@@ -799,11 +802,12 @@ def build_trends(county_df, county_name, county_id):
     return html, figures
 
 
-def build_growth_quadrant(county_df, county_name, county_id):
+def build_growth_quadrant(county_df, county_name, county_id, heading_level=2):
     """Growth Quadrant — YoY employment vs salary growth, domain-colored bubbles."""
+    h, _h = f"h{heading_level}", f"/h{heading_level}"
     plot_data = get_growth_quadrant_data(county_df)
     if plot_data.empty:
-        return '<div class="section"><h2>Industry Landscape</h2><p>No disclosable industry growth data.</p></div>', {}
+        return f'<div class="section"><{h}>Industry Landscape<{_h}><p>No disclosable industry growth data.</p></div>', {}
 
     year, qtr = int(plot_data["year"].iloc[0]), int(plot_data["qtr"].iloc[0])
 
@@ -848,7 +852,7 @@ def build_growth_quadrant(county_df, county_name, county_id):
     )
 
     html = (
-        f'<div class="section"><h2>Industry Landscape</h2>'
+        f'<div class="section"><{h}>Industry Landscape<{_h}>'
         f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
         f"{_chart_div(div_id, aria)}</figure>{table}{SOURCE}{GROWTH_QUADRANT_NOTE}</div>"
     )
@@ -862,15 +866,16 @@ from components.employment_treemap import METHODOLOGY_NOTE as _EMPLOYMENT_TREEMA
 EMPLOYMENT_TREEMAP_NOTE = f'<p class="source"><em>{_EMPLOYMENT_TREEMAP_TEXT}</em></p>'
 
 
-def build_firm_formation(county_df, county_name, county_id):
+def build_firm_formation(county_df, county_name, county_id, heading_level=2):
     """Firm Openings & Closings — quarterly establishment churn (industry-level decomposition)."""
     from components.firm_formation import build_figure as firm_formation_fig
     from data.clean import get_firm_formation_data, get_national_qoq_pct
     from data.fetch import fetch_national_data
 
+    h, _h = f"h{heading_level}", f"/h{heading_level}"
     plot_data = get_firm_formation_data(county_df)
     if plot_data.empty:
-        return '<div class="section"><h2>Firm Openings &amp; Closings</h2><p>Not enough establishment data to compute quarterly churn.</p></div>', {}
+        return f'<div class="section"><{h}>Firm Openings &amp; Closings<{_h}><p>Not enough establishment data to compute quarterly churn.</p></div>', {}
 
     # National benchmark — graceful fallback to 3-trace chart if the fetch fails.
     try:
@@ -919,7 +924,7 @@ def build_firm_formation(county_df, county_name, county_id):
     )
 
     html = (
-        f'<div class="section"><h2>Firm Openings &amp; Closings</h2>'
+        f'<div class="section"><{h}>Firm Openings &amp; Closings<{_h}>'
         f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
         f"{_chart_div(div_id, aria)}</figure>{table}{SOURCE}{FIRM_FORMATION_NOTE}</div>"
     )
@@ -928,14 +933,15 @@ def build_firm_formation(county_df, county_name, county_id):
 
 # ── HTML Assembly ────────────────────────────────────────────────────────────
 
-def build_employment_treemap(county_df, county_name, county_id):
+def build_employment_treemap(county_df, county_name, county_id, heading_level=2):
     """Workforce Composition — multi-trace treemap with year-selector buttons."""
     from components.employment_treemap import build_figure as treemap_fig
     from data.clean import get_treemap_snapshots
 
+    h, _h = f"h{heading_level}", f"/h{heading_level}"
     snapshots = get_treemap_snapshots(county_df)
     if not snapshots:
-        return '<div class="section"><h2>Workforce Composition</h2><p>No disclosable employment data.</p></div>', {}
+        return f'<div class="section"><{h}>Workforce Composition<{_h}><p>No disclosable employment data.</p></div>', {}
 
     year, qtr, latest = snapshots[-1]
     top3 = latest.head(3)
@@ -996,7 +1002,7 @@ def build_employment_treemap(county_df, county_name, county_id):
     )
 
     html = (
-        f'<div class="section"><h2>Workforce Composition</h2>'
+        f'<div class="section"><{h}>Workforce Composition<{_h}>'
         f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
         f"{_chart_div(div_id, aria)}{year_selector}</figure>"
         f"{table}{SOURCE}{EMPLOYMENT_TREEMAP_NOTE}</div>"
@@ -1117,7 +1123,12 @@ def build_html(df):
         ]
         for _slug, builder in SECTION_BUILDERS:
             sections.append('<div class="divider"></div>')
-            section_html, section_figs = builder(county_df, county_name, county_id)
+            # Index detail sections sit under the h3 county name, itself under the
+            # h2 "County Detail" — so they must be h4 to keep the hierarchy nested
+            # (WCAG 1.3.1). Standalone embeds keep the default h2 (under their h1).
+            section_html, section_figs = builder(
+                county_df, county_name, county_id, heading_level=4
+            )
             sections.append(section_html)
             figures.update(section_figs)
 
