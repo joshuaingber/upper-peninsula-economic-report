@@ -1,0 +1,12 @@
+{
+  "name": "up-regional-report",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Accessibility tooling for the Upper Peninsula Regional Economic Report static build. Run `npm install` once, then `npm run a11y` to check docs/ against WCAG 2.1 AA.",
+  "scripts": {
+    "a11y": "node scripts/a11y.mjs"
+  },
+  "devDependencies": {
+    "pa11y-ci": "^3.1.0"
+  }
+}

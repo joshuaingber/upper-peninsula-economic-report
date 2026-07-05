@@ -29,6 +29,19 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python build.py
 
+      # WCAG 2.1 AA gate. Runs AFTER the build and BEFORE the commit, so a
+      # regression fails the job and the commit step is skipped — the last good
+      # published pages are preserved (same fail-safe as the FRED guard). The
+      # gate is data-independent (structure/contrast/ARIA don't change with the
+      # numbers), so a passing build keeps passing week to week.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Accessibility gate (WCAG 2.1 AA)
+        run: |
+          npm install
+          npm run a11y
+
       - name: Commit and push if changed
         uses: stefanzweifel/git-auto-commit-action@v7
         with:

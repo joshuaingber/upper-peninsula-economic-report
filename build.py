@@ -11,6 +11,7 @@ Usage:
 """
 from __future__ import annotations
 
+import html as _html
 import json
 import sys
 from datetime import datetime, timezone
@@ -33,6 +34,7 @@ from data.constants import (
     FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_GRAY,
     FAU_ELECTRIC_BLUE, FAU_SKY_BLUE, COUNTY_COLORS, COUNTIES,
     NMU_FONT_FAMILY, GOOGLE_FONTS_IMPORT, PLOTLY_FONT,
+    NMU_LINK, NMU_MUTED, NMU_BORDER,
 )
 from utils.formatting import fmt_number, fmt_currency, fmt_pct
 from utils.narratives import narrate_employment_trends, format_industry_list
@@ -56,6 +58,74 @@ def _detail_counties(df) -> list[str]:
     return list(COUNTIES.values())[:DETAIL_COUNTY_N]
 
 # ── CSS ──────────────────────────────────────────────────────────────────────
+
+# Shared WCAG 2.1 AA layer, appended to BOTH the main and embed stylesheets.
+# It (a) overrides the few brand colors that fail contrast on white — bright
+# gold links, #888 muted text, #CCCCCC borders — with accessible tokens, and
+# (b) adds styles for the new accessible components (visible focus rings,
+# screen-reader-only text, collapsible data tables, keyboard year buttons).
+# Placed LAST so its rules win on source order over the base definitions.
+A11Y_CSS = """
+/* ── Accessibility (WCAG 2.1 AA) ─────────────────────────────────────────── */
+.kpi-period, .kpi-caption, .source, .footer { color: """ + NMU_MUTED + """; }
+.source a, .footer a { color: """ + NMU_LINK + """; text-decoration: underline; }
+.tab-bar { border-bottom-color: """ + NMU_BORDER + """; }
+.kpi-row.secondary { border-top-color: """ + NMU_BORDER + """; }
+.kpi-label { line-height: 1.1; }
+
+/* 2.4.7 Focus Visible — a clearly visible keyboard focus indicator (≥3:1). */
+a:focus-visible, button:focus-visible, summary:focus-visible,
+[tabindex]:focus-visible {
+    outline: 3px solid """ + FAU_BLUE + """;
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* Screen-reader-only text (visually hidden, still announced). */
+.sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* Each chart is a figure with a visible caption. */
+figure.chart-figure { margin: 0; }
+figure.chart-figure > figcaption { margin-bottom: 0.75rem; }
+
+/* Collapsible data tables — the machine-readable alternative to each chart. */
+.data-table-details { margin: 0.25rem 0 0.75rem; }
+.data-table-details > summary {
+    cursor: pointer; font-size: 0.9rem; font-weight: 600;
+    color: """ + FAU_BLUE + """; padding: 0.35rem 0;
+}
+.data-table-details > summary:hover { text-decoration: underline; }
+.table-scroll { overflow-x: auto; }
+table.data-table {
+    border-collapse: collapse; width: 100%;
+    font-size: 0.85rem; margin-top: 0.5rem;
+}
+table.data-table caption {
+    text-align: left; font-size: 0.85rem;
+    color: """ + NMU_MUTED + """; padding-bottom: 0.35rem;
+}
+table.data-table th, table.data-table td {
+    border: 1px solid """ + NMU_BORDER + """;
+    padding: 0.3rem 0.55rem; text-align: right;
+}
+table.data-table thead th { background: """ + FAU_SKY_BLUE + """; color: """ + FAU_BLUE + """; }
+table.data-table th[scope="row"] { text-align: left; }
+
+/* Keyboard-operable year selector (treemap) — real buttons, not Plotly SVG. */
+.year-select { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0 0.25rem; }
+.year-select .year-btn {
+    font-family: inherit; font-size: 0.85rem; cursor: pointer;
+    padding: 0.3rem 0.7rem; border: 1px solid """ + NMU_BORDER + """;
+    background: #fff; color: """ + FAU_DARK_GRAY + """; border-radius: 4px;
+}
+.year-select .year-btn[aria-pressed="true"] {
+    background: """ + FAU_BLUE + """; color: #fff; border-color: """ + FAU_BLUE + """;
+}
+"""
 
 CSS = GOOGLE_FONTS_IMPORT + """
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -181,16 +251,38 @@ h1, h2, h3, h4 { color: """ + FAU_BLUE + """; }
     body { padding: 0.5rem 1rem; }
     .tab-btn { padding: 0.5rem 1rem; font-size: 0.9rem; }
 }
-"""
+""" + A11Y_CSS
 
 # ── JavaScript ───────────────────────────────────────────────────────────────
 
-JS = """
+# Keyboard-accessible treemap year selector: HTML buttons toggle which Plotly
+# trace (one per year) is visible, replacing Plotly's non-focusable SVG
+# updatemenus. Shared by the main dashboard and the embeds.
+TREEMAP_JS = """
+function selectTreemapYear(btn) {
+    var target = btn.getAttribute('data-target');
+    var idx = parseInt(btn.getAttribute('data-trace'), 10);
+    var n = parseInt(btn.getAttribute('data-count'), 10);
+    var vis = [];
+    for (var i = 0; i < n; i++) { vis.push(i === idx); }
+    Plotly.restyle(target, {visible: vis});
+    btn.parentNode.querySelectorAll('.year-btn').forEach(function(b) {
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+    });
+}
+"""
+
+JS = TREEMAP_JS + """
 function showTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
-    document.querySelectorAll('.tab-btn').forEach(function(el) { el.classList.remove('active'); });
+    document.querySelectorAll('.tab-btn').forEach(function(el) {
+        el.classList.remove('active');
+        el.setAttribute('aria-pressed', 'false');
+    });
     document.getElementById(tabId).classList.add('active');
-    document.querySelector('[data-tab="' + tabId + '"]').classList.add('active');
+    var btn = document.querySelector('[data-tab="' + tabId + '"]');
+    btn.classList.add('active');
+    btn.setAttribute('aria-pressed', 'true');
     setTimeout(function() {
         document.querySelectorAll('#' + tabId + ' .plotly-chart').forEach(function(el) {
             if (el.data) Plotly.Plots.resize(el);
@@ -200,7 +292,7 @@ function showTab(tabId) {
 
 Object.keys(figureData).forEach(function(divId) {
     var fig = figureData[divId];
-    Plotly.newPlot(divId, fig.data, fig.layout, {responsive: true});
+    Plotly.newPlot(divId, fig.data, fig.layout, {responsive: true, displayModeBar: false});
 });
 """
 
@@ -283,15 +375,15 @@ h1, h2, h3, h4 { color: """ + FAU_BLUE + """; }
     .snapshot-row, .chart-row { flex-direction: column; }
     body { padding: 0.3rem; }
 }
-"""
+""" + A11Y_CSS
 
 # Each embed posts its rendered height to the parent host page via postMessage.
 # Debounce (100 ms) + last-height dedupe kill the feedback loop where Plotly's
 # responsive: true would re-fire layout when the parent resizes the iframe.
-EMBED_JS = """
+EMBED_JS = TREEMAP_JS + """
 Object.keys(figureData).forEach(function(divId) {
     var fig = figureData[divId];
-    Plotly.newPlot(divId, fig.data, fig.layout, {responsive: true});
+    Plotly.newPlot(divId, fig.data, fig.layout, {responsive: true, displayModeBar: false});
 });
 
 (function() {
@@ -337,7 +429,13 @@ def wrap_as_embed(body_html: str, figures: dict, page_title: str) -> str:
         "</style>",
         "</head>",
         "<body>",
+        "<main>",
+        # Each embed is its own document, so it needs exactly one h1 for a valid
+        # heading outline. It's visually hidden (the design has no visible page
+        # title inside the iframe) but announced by screen readers.
+        f'<h1 class="sr-only">{_html.escape(page_title)}</h1>',
         body_html,
+        "</main>",
         "<script>",
         f"var figureData = {figures_json};",
         EMBED_JS,
@@ -365,13 +463,108 @@ def _fig_json(fig):
     return json.loads(fig.to_json())
 
 
+# ── Accessibility helpers ────────────────────────────────────────────────────
+# Each chart is paired with (a) a role="img" mount point carrying a concise
+# aria-label and (b) a collapsible, machine-readable data table built from the
+# same DataFrame that feeds the chart — the WCAG 1.1.1 text alternative.
+
+def _chart_div(div_id, aria_label):
+    """Plotly mount point exposed to assistive tech as one labeled image.
+
+    role="img" makes screen readers announce `aria_label` and skip the SVG
+    internals Plotly injects at runtime; the adjacent data table carries the
+    full numbers.
+    """
+    return (
+        f'<div id="{div_id}" class="plotly-chart" role="img" '
+        f'aria-label="{_html.escape(aria_label)}"></div>'
+    )
+
+
+def _pct_str(v):
+    """Signed percent for a table cell; em dash when missing."""
+    return "—" if pd.isna(v) else f"{v:+.1f}%"
+
+
+def _data_table_html(caption, columns, rows):
+    """Build a WCAG-compliant, collapsible data table.
+
+    columns: header labels; the first names the row-header column.
+    rows: iterable of tuples; each row's first cell becomes a <th scope="row">.
+    Cell values are pre-formatted strings.
+    """
+    head = "".join(f'<th scope="col">{_html.escape(str(c))}</th>' for c in columns)
+    body = []
+    for row in rows:
+        cells = [f'<th scope="row">{_html.escape(str(row[0]))}</th>']
+        cells += [f"<td>{_html.escape(str(v))}</td>" for v in row[1:]]
+        body.append("<tr>" + "".join(cells) + "</tr>")
+    cap = _html.escape(caption)
+    return (
+        '<details class="data-table-details">'
+        f"<summary>Show data table — {cap}</summary>"
+        '<div class="table-scroll">'
+        f'<table class="data-table"><caption>{cap}</caption>'
+        f"<thead><tr>{head}</tr></thead>"
+        f'<tbody>{"".join(body)}</tbody></table>'
+        "</div></details>"
+    )
+
+
+def _map_table_html(summary):
+    """Data table for the county choropleth (one row per county)."""
+    ordered = summary.sort_values("employment", ascending=False, na_position="last")
+    rows = [
+        (
+            f'{r["county_name"]} County',
+            fmt_number(r["employment"]),
+            fmt_number(r["qtrly_estabs"]),
+            fmt_currency(r["avg_annual_wage"]),
+            _pct_str(r.get("oty_emp_pct")),
+        )
+        for _, r in ordered.iterrows()
+    ]
+    return _data_table_html(
+        "Upper Peninsula counties — latest-quarter employment, establishments, "
+        "average salary, and year-over-year employment growth",
+        ["County", "Employment", "Establishments", "Average Salary",
+         "YoY Employment Growth"],
+        rows,
+    )
+
+
+def _top_table_html(top):
+    """Data table for the largest-county growth comparison."""
+    rows = [
+        (
+            f'{r["county_name"]} County',
+            _pct_str(r["oty_emp_pct"]),
+            _pct_str(r["oty_estab_pct"]),
+            _pct_str(r["oty_wage_pct"]),
+        )
+        for _, r in top.iterrows()
+    ]
+    return _data_table_html(
+        "Largest Upper Peninsula county economies — year-over-year growth in "
+        "employment, establishments, and wages",
+        ["County", "YoY Employment", "YoY Establishments", "YoY Wages"],
+        rows,
+    )
+
+
 def _delta_html(pct):
-    """Render a YoY percent-change badge."""
+    """Render a YoY percent-change badge.
+
+    Direction is conveyed three ways (WCAG 1.4.1 — never color alone): the
+    ▲/▼ glyph, the value, and an aria-label word for screen readers.
+    """
     if pd.isna(pct):
         return ""
     css = "positive" if pct >= 0 else "negative"
     arrow = "&#9650;" if pct >= 0 else "&#9660;"
-    return f'<div class="kpi-delta {css}">{arrow} {abs(pct):.1f}% YoY</div>'
+    word = "increased" if pct >= 0 else "decreased"
+    label = f"{word} {abs(pct):.1f} percent year over year"
+    return f'<div class="kpi-delta {css}" aria-label="{label}">{arrow} {abs(pct):.1f}% YoY</div>'
 
 
 # ── KPI Card ─────────────────────────────────────────────────────────────────
@@ -388,7 +581,9 @@ def _secondary_row_html(secondary):
         growth = gdp["yoy_growth"]
         arrow = "&#9650;" if growth >= 0 else "&#9660;"
         cls = "positive" if growth >= 0 else "negative"
-        gdp_delta = f'<div class="kpi-delta {cls}">{arrow} {abs(growth)*100:.1f}% YoY</div>'
+        word = "increased" if growth >= 0 else "decreased"
+        glabel = f"{word} {abs(growth)*100:.1f} percent year over year"
+        gdp_delta = f'<div class="kpi-delta {cls}" aria-label="{glabel}">{arrow} {abs(growth)*100:.1f}% YoY</div>'
         gdp_period = f'<div class="kpi-period">({gdp["year"]})</div>'
     else:
         gdp_value, gdp_delta, gdp_period = "—", "", '<div class="kpi-period">(unavailable)</div>'
@@ -400,7 +595,9 @@ def _secondary_row_html(secondary):
         # rising = red (bad), falling = green (good) — lower-is-better.
         arrow = "&#9650;" if delta >= 0 else "&#9660;"
         cls = "negative" if delta >= 0 else "positive"
-        unr_delta = f'<div class="kpi-delta {cls}">{arrow} {abs(delta):.1f}pp YoY</div>'
+        word = "rose" if delta >= 0 else "fell"
+        ulabel = f"{word} {abs(delta):.1f} percentage points year over year"
+        unr_delta = f'<div class="kpi-delta {cls}" aria-label="{ulabel}">{arrow} {abs(delta):.1f}pp YoY</div>'
         unr_period = f'<div class="kpi-period">({unr["month_label"]})</div>'
     else:
         unr_value, unr_delta, unr_period = "—", "", '<div class="kpi-period">(unavailable)</div>'
@@ -576,13 +773,28 @@ def build_trends(county_df, county_name, county_id):
     eid, wid = f"{county_id}-trends-empl", f"{county_id}-trends-wage"
     figures = {eid: _fig_json(fig_e), wid: _fig_json(fig_w)}
 
+    yr0, yr1 = int(earliest["year"]), int(latest["year"])
+    empl_aria = f"Trend line of total employment in {county_name} County, {yr0} to {yr1}."
+    wage_aria = (
+        f"Trend line of average annual salary in {county_name} County, "
+        f"{yr0} to {yr1}, on a logarithmic scale."
+    )
+    table = _data_table_html(
+        f"{county_name} County — quarterly total employment and average salary",
+        ["Quarter", "Total Employment", "Average Salary"],
+        [
+            (r["year_qtr"], fmt_number(r["employment"]), fmt_currency(r["avg_annual_wage"]))
+            for _, r in totals.iterrows()
+        ],
+    )
+
     html = (
         f'<div class="section"><h2>Employment &amp; Salary Trends</h2>'
-        f'<p>{narrative}</p>'
+        f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
         f'<div class="chart-row">'
-        f'<div class="chart-col"><div id="{eid}" class="plotly-chart"></div></div>'
-        f'<div class="chart-col"><div id="{wid}" class="plotly-chart"></div></div>'
-        f'</div>{SOURCE}{TRENDS_NOTE}</div>'
+        f'<div class="chart-col">{_chart_div(eid, empl_aria)}</div>'
+        f'<div class="chart-col">{_chart_div(wid, wage_aria)}</div>'
+        f'</div></figure>{table}{SOURCE}{TRENDS_NOTE}</div>'
     )
     return html, figures
 
@@ -616,10 +828,29 @@ def build_growth_quadrant(county_df, county_name, county_id):
     div_id = f"{county_id}-growth-quadrant"
     figures = {div_id: _fig_json(fig)}
 
+    aria = (
+        f"Bubble chart of {len(plot_data)} industries in {county_name} County, "
+        f"{year} Q{qtr}, plotted by year-over-year employment growth (horizontal) "
+        f"and wage growth (vertical); bubble size reflects employment."
+    )
+    table = _data_table_html(
+        f"{county_name} County — industry employment and year-over-year growth, {year} Q{qtr}",
+        ["Industry", "Employment", "YoY Employment Growth", "YoY Wage Growth"],
+        [
+            (
+                r["industry_label"],
+                fmt_number(r["employment"]),
+                _pct_str(r["oty_month3_emplvl_pct_chg"]),
+                _pct_str(r["oty_avg_wkly_wage_pct_chg"]),
+            )
+            for _, r in plot_data.sort_values("employment", ascending=False).iterrows()
+        ],
+    )
+
     html = (
         f'<div class="section"><h2>Industry Landscape</h2>'
-        f'<p>{narrative}</p>'
-        f'<div id="{div_id}" class="plotly-chart"></div>{SOURCE}{GROWTH_QUADRANT_NOTE}</div>'
+        f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
+        f"{_chart_div(div_id, aria)}</figure>{table}{SOURCE}{GROWTH_QUADRANT_NOTE}</div>"
     )
     return html, figures
 
@@ -669,10 +900,28 @@ def build_firm_formation(county_df, county_name, county_id):
     div_id = f"{county_id}-firm-formation"
     figures = {div_id: _fig_json(fig)}
 
+    aria = (
+        f"Bar chart of quarterly establishment additions and losses in "
+        f"{county_name} County, with a net-change line overlay."
+    )
+    table = _data_table_html(
+        f"{county_name} County — quarterly establishment additions, losses, and net change",
+        ["Quarter", "Establishments Added", "Establishments Lost", "Net Change"],
+        [
+            (
+                r["year_qtr"],
+                f"{int(r['additions']):+,}",
+                f"{int(r['subtractions']):+,}",
+                "—" if pd.isna(r["net"]) else f"{int(r['net']):+,}",
+            )
+            for _, r in plot_data.iterrows()
+        ],
+    )
+
     html = (
         f'<div class="section"><h2>Firm Openings &amp; Closings</h2>'
-        f'<p>{narrative}</p>'
-        f'<div id="{div_id}" class="plotly-chart"></div>{SOURCE}{FIRM_FORMATION_NOTE}</div>'
+        f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
+        f"{_chart_div(div_id, aria)}</figure>{table}{SOURCE}{FIRM_FORMATION_NOTE}</div>"
     )
     return html, figures
 
@@ -700,13 +949,57 @@ def build_employment_treemap(county_df, county_name, county_id):
     )
 
     fig = treemap_fig(snapshots)
+    # Plotly's year menu is a non-focusable SVG control (fails WCAG 2.1.1).
+    # Strip it and drive the same trace-visibility toggle from real HTML
+    # buttons (built below), which are keyboard-operable and expose state.
+    # (Assign the property directly — update_layout(updatemenus=[]) merges and
+    # would leave the existing menu in place.)
+    fig.layout.updatemenus = []
     div_id = f"{county_id}-employment-treemap"
     figures = {div_id: _fig_json(fig)}
 
+    n = len(snapshots)
+    default_idx = n - 1
+    year_selector = ""
+    if n > 1:
+        btns = "".join(
+            f'<button type="button" class="year-btn" '
+            f'aria-pressed="{"true" if i == default_idx else "false"}" '
+            f'data-target="{div_id}" data-trace="{i}" data-count="{n}" '
+            f'onclick="selectTreemapYear(this)">{yr}</button>'
+            for i, (yr, _q, _snap) in enumerate(snapshots)
+        )
+        year_selector = (
+            f'<div class="year-select" role="group" '
+            f'aria-label="Select year for the {county_name} County workforce treemap">'
+            f"{btns}</div>"
+        )
+
+    aria = (
+        f"Treemap of private-sector employment by industry in {county_name} "
+        f"County, {year} Q{qtr}; rectangle size reflects employment."
+    )
+    table = _data_table_html(
+        f"{county_name} County — private employment by industry sector, {year} Q{qtr}",
+        ["Sector", "Employment", "Share of Private Workforce", "Establishments",
+         "Average Salary"],
+        [
+            (
+                r["industry_label"],
+                fmt_number(r["employment"]),
+                f'{r["share"] * 100:.1f}%',
+                fmt_number(r["qtrly_estabs"]),
+                fmt_currency(r["avg_annual_wage"]),
+            )
+            for _, r in latest.iterrows()
+        ],
+    )
+
     html = (
         f'<div class="section"><h2>Workforce Composition</h2>'
-        f'<p>{narrative}</p>'
-        f'<div id="{div_id}" class="plotly-chart"></div>{SOURCE}{EMPLOYMENT_TREEMAP_NOTE}</div>'
+        f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
+        f"{_chart_div(div_id, aria)}{year_selector}</figure>"
+        f"{table}{SOURCE}{EMPLOYMENT_TREEMAP_NOTE}</div>"
     )
     return html, figures
 
@@ -755,13 +1048,18 @@ def build_html(df):
     geojson = _load_geojson()
     if not summary.empty and geojson is not None:
         figures["up-county-map"] = _fig_json(_map_fig(summary, geojson))
+        map_aria = (
+            "Choropleth map of the 15 Upper Peninsula counties shaded by "
+            "year-over-year employment growth."
+        )
         map_html = (
             '<div class="section"><h2>Upper Peninsula at a Glance</h2>'
-            '<p>Counties are shaded by year-over-year employment growth (latest '
-            'published QCEW quarter). Hover any county for its employment, '
-            'establishment count, and average salary.</p>'
-            '<div id="up-county-map" class="plotly-chart"></div>'
-            f'{SOURCE}</div>'
+            '<figure class="chart-figure"><figcaption>Counties are shaded by '
+            'year-over-year employment growth (latest published QCEW quarter). '
+            'Hover any county for its employment, establishment count, and average '
+            'salary.</figcaption>'
+            f'{_chart_div("up-county-map", map_aria)}</figure>'
+            f'{_map_table_html(summary)}{SOURCE}</div>'
         )
     else:
         map_html = (
@@ -772,12 +1070,17 @@ def build_html(df):
     top = get_top_counties(df)
     if not top.empty:
         figures["up-top-counties"] = _fig_json(_top_fig(top))
+        top_aria = (
+            "Grouped bar chart comparing year-over-year employment, establishment, "
+            "and wage growth for the five largest Upper Peninsula county economies."
+        )
         top_html = (
             '<div class="section"><h2>Largest County Economies</h2>'
-            '<p>The five UP counties with the most covered employment, compared on '
-            'year-over-year growth in jobs, businesses, and wages.</p>'
-            '<div id="up-top-counties" class="plotly-chart"></div>'
-            f'{SOURCE}</div>'
+            '<figure class="chart-figure"><figcaption>The five UP counties with the '
+            'most covered employment, compared on year-over-year growth in jobs, '
+            'businesses, and wages.</figcaption>'
+            f'{_chart_div("up-top-counties", top_aria)}</figure>'
+            f'{_top_table_html(top)}{SOURCE}</div>'
         )
     else:
         top_html = (
@@ -802,6 +1105,8 @@ def build_html(df):
 
         tab_buttons += (
             f'<button class="tab-btn{active}" data-tab="{county_id}" '
+            f'aria-pressed="{"true" if idx == 0 else "false"}" '
+            f'aria-controls="{county_id}" '
             f"onclick=\"showTab('{county_id}')\">{county_name} County</button>\n"
         )
 
@@ -847,8 +1152,8 @@ def build_html(df):
         '<div class="divider"></div>',
         top_html,
         '<div class="divider"></div>',
-        f'<h3 style="color: {FAU_BLUE};">County Detail</h3>',
-        f'<div class="tab-bar">{tab_buttons}</div>',
+        f'<h2 style="color: {FAU_BLUE};">County Detail</h2>',
+        f'<div class="tab-bar" role="group" aria-label="Select a county">{tab_buttons}</div>',
         tab_content,
         '<footer class="footer">',
         f'Source: <a href="https://www.bls.gov/cew/">BLS QCEW</a> &mdash; Quarterly '
@@ -910,9 +1215,17 @@ def write_embeds(df):
     summary = latest_county_summaries(df)
     geojson = _load_geojson()
     if not summary.empty and geojson is not None:
+        map_aria = (
+            "Choropleth map of the 15 Upper Peninsula counties shaded by "
+            "year-over-year employment growth."
+        )
         map_body = (
             '<div class="section"><h2>Upper Peninsula at a Glance</h2>'
-            '<div id="up-county-map" class="plotly-chart"></div></div>'
+            '<figure class="chart-figure"><figcaption>Counties shaded by '
+            'year-over-year employment growth (latest published QCEW quarter).'
+            '</figcaption>'
+            f'{_chart_div("up-county-map", map_aria)}</figure>'
+            f'{_map_table_html(summary)}</div>'
         )
         (embeds_dir / "up-map.html").write_text(
             wrap_as_embed(
@@ -924,9 +1237,17 @@ def write_embeds(df):
 
     top = get_top_counties(df)
     if not top.empty:
+        top_aria = (
+            "Grouped bar chart comparing year-over-year employment, establishment, "
+            "and wage growth for the five largest Upper Peninsula county economies."
+        )
         top_body = (
             '<div class="section"><h2>Largest County Economies</h2>'
-            '<div id="up-top-counties" class="plotly-chart"></div></div>'
+            '<figure class="chart-figure"><figcaption>The five UP counties with the '
+            'most covered employment, compared on year-over-year growth in jobs, '
+            'businesses, and wages.</figcaption>'
+            f'{_chart_div("up-top-counties", top_aria)}</figure>'
+            f'{_top_table_html(top)}</div>'
         )
         (embeds_dir / "up-top-counties.html").write_text(
             wrap_as_embed(
@@ -949,8 +1270,8 @@ def write_embeds(df):
         }
         card_html = build_kpi_card(county_df, county_name, color, secondary)
         body = (
-            f'<h3 style="color: {FAU_BLUE}; margin-bottom: 0.5rem;">'
-            f'{county_name} County Snapshot</h3>'
+            f'<h2 style="color: {FAU_BLUE}; margin-bottom: 0.5rem;">'
+            f'{county_name} County Snapshot</h2>'
             f'<div class="snapshot-row single-county">{card_html}</div>'
             f'{KPI_CAPTION_HTML}'
         )
