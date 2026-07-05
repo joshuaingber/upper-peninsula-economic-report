@@ -115,8 +115,15 @@ def build_figure(summary: pd.DataFrame, geojson: dict) -> go.Figure:
         z=z,
         zmid=0,
         colorscale=MAP_DIVERGING_SCALE,
-        marker_line_color="white",
-        marker_line_width=1,
+        # Black county boundaries, not white: on the diverging red->gold->green
+        # scale the near-zero counties render light gold, and white 1px borders
+        # vanish against them (~1.6:1). Black clears the light-gold midtone with
+        # room to spare (~13:1) and is the best single-color worst-case across the
+        # whole scale. A single border can't hit 3:1 against both the light middle
+        # and the dark red/green ends, so this is a best-effort separation cue;
+        # the map's data table remains the normative fallback (WCAG 1.1.1).
+        marker_line_color="black",
+        marker_line_width=1.5,
         customdata=customdata,
         colorbar=dict(
             title=dict(text="Employment<br>growth (YoY)", side="right"),

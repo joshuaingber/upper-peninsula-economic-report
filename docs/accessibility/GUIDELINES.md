@@ -71,9 +71,13 @@ Media criteria (WCAG 1.2.x, audio/video) are not applicable — the site has no 
 
 ### Robust
 
-- **4.1.2 Name, Role, Value (A)** — Custom controls expose name, role, and state: tabs use
-  `role="tab"` + `aria-selected` with `role="tabpanel"` panels; year buttons use `aria-pressed`;
-  each chart container uses `role="img"` + `aria-label`.
+- **4.1.2 Name, Role, Value (A)** — Custom controls expose name, role, and state: the county
+  selector is a `role="group"` of native `<button>`s, each carrying `aria-pressed` for its
+  selected state and `aria-controls` pointing at its panel (a plain `<div class="tab-content">`);
+  the treemap year buttons likewise use `aria-pressed`; each chart container uses `role="img"` +
+  `aria-label`. (This is a native-button group, not an ARIA `role="tab"`/`tabpanel` widget — the
+  static build renders every county inline, so there is no single-selection tablist to model; the
+  buttons stay fully operable and labeled without adopting tab semantics.)
 
 ---
 
