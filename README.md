@@ -82,6 +82,11 @@ docs/             Published GitHub Pages output
 - **Federal Reserve Bank of St. Louis**, FRED economic data — county real GDP (`REALGDPALL{fips}`) and unemployment rate (`LAUCN{fips}0000000003`) series. https://fred.stlouisfed.org/
 - **Internal Revenue Service**, Statistics of Income (SOI) county-to-county migration data. https://www.irs.gov/statistics/soi-tax-stats-migration-data
 
+## Contributing
+
+Fixes and updates are welcome via fork and pull request. See [`CONTRIBUTING.md`](CONTRIBUTING.md)
+for the workflow and the accessibility requirement every change must keep passing.
+
 ## License
 
 MIT — see [`LICENSE`](LICENSE). Original work © Bryan Cutsinger; see Attribution above.
