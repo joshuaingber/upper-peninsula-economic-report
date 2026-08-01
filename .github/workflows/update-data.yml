@@ -34,7 +34,7 @@ jobs:
       # published pages are preserved (same fail-safe as the FRED guard). The
       # gate is data-independent (structure/contrast/ARIA don't change with the
       # numbers), so a passing build keeps passing week to week.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - name: Accessibility gate (WCAG 2.1 AA)
