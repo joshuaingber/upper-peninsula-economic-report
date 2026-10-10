@@ -16,8 +16,10 @@ Base URL: `https://joshuaingber.github.io/upper-peninsula-economic-report/embeds
 
 ## Available Embeds
 
-There are 27 embeds: 2 region-wide overviews, plus a KPI snapshot and 4 chart sections for each of
-the five largest UP county economies (Chippewa, Delta, Dickinson, Houghton, Marquette).
+There are 77 embeds: 2 region-wide overviews, plus a KPI snapshot and 4 chart sections for each of
+the 15 UP counties. The smallest counties have sparser industry charts because BLS suppresses QCEW
+detail for confidentiality (Keweenaw is the sparsest); the charts render only the disclosable
+sectors, and every county still has a full KPI snapshot and employment/salary trends.
 
 | Embed | Path (append to base URL) | Suggested height | Min. width |
 |---|---|---:|---:|
@@ -25,14 +27,25 @@ the five largest UP county economies (Chippewa, Delta, Dickinson, Houghton, Marq
 | Upper Peninsula county map (choropleth) | `up-map.html` | 700 px | 600 px |
 | Largest county economies (grouped bar) | `up-top-counties.html` | 600 px | 700 px |
 | **County KPI snapshots** | | | |
-| Chippewa KPI Snapshot | `kpi-chippewa.html` | 320 px | 360 px |
+| Marquette KPI Snapshot | `kpi-marquette.html` | 320 px | 360 px |
 | Delta KPI Snapshot | `kpi-delta.html` | 320 px | 360 px |
 | Dickinson KPI Snapshot | `kpi-dickinson.html` | 320 px | 360 px |
 | Houghton KPI Snapshot | `kpi-houghton.html` | 320 px | 360 px |
-| Marquette KPI Snapshot | `kpi-marquette.html` | 320 px | 360 px |
+| Chippewa KPI Snapshot | `kpi-chippewa.html` | 320 px | 360 px |
+| Menominee KPI Snapshot | `kpi-menominee.html` | 320 px | 360 px |
+| Gogebic KPI Snapshot | `kpi-gogebic.html` | 320 px | 360 px |
+| Mackinac KPI Snapshot | `kpi-mackinac.html` | 320 px | 360 px |
+| Iron KPI Snapshot | `kpi-iron.html` | 320 px | 360 px |
+| Baraga KPI Snapshot | `kpi-baraga.html` | 320 px | 360 px |
+| Schoolcraft KPI Snapshot | `kpi-schoolcraft.html` | 320 px | 360 px |
+| Alger KPI Snapshot | `kpi-alger.html` | 320 px | 360 px |
+| Luce KPI Snapshot | `kpi-luce.html` | 320 px | 360 px |
+| Ontonagon KPI Snapshot | `kpi-ontonagon.html` | 320 px | 360 px |
+| Keweenaw KPI Snapshot | `kpi-keweenaw.html` | 320 px | 360 px |
 
-Each detail county has the same four chart sections. Replace `<county>` with one of `chippewa`,
-`delta`, `dickinson`, `houghton`, `marquette`:
+Each county has the same four chart sections. Replace `<county>` with one of `marquette`, `delta`,
+`dickinson`, `houghton`, `chippewa`, `menominee`, `gogebic`, `mackinac`, `iron`, `baraga`,
+`schoolcraft`, `alger`, `luce`, `ontonagon`, `keweenaw`:
 
 | Section | Path (append to base URL) | Suggested height | Min. width |
 |---|---|---:|---:|

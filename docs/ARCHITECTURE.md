@@ -77,7 +77,7 @@ The selected county renders 4 sections:
 
 The report covers all **15 UP counties** (state FIPS 26), ordered west→east in `COUNTIES` (`data/constants.py`): Gogebic, Ontonagon, Iron, Houghton, Keweenaw, Baraga, Dickinson, Menominee, Marquette, Alger, Delta, Schoolcraft, Luce, Mackinac, Chippewa.
 
-Per-county KPI cards and detail embeds are generated for the **five largest county economies by employment** (`DETAIL_COUNTY_N = 5` in `build.py`, via `get_top_counties`): typically Marquette, Chippewa, Delta, Houghton, Dickinson. County accent colors come from `COUNTY_COLORS` (a WCAG-safe qualitative palette). BLS suppresses QCEW detail for the smallest counties; suppressed cells render "N/A" (map) or "—" (KPI cards), never zeros.
+Per-county KPI cards and detail embeds are generated for **all 15 counties** (`DETAIL_COUNTY_N = len(COUNTIES)` in `build.py`), ranked by latest employment via `get_top_counties`. Every county has non-suppressed total-covered data, so each gets a valid KPI card and employment/salary trends. County accent colors come from `COUNTY_COLORS` (a WCAG-safe qualitative palette, cycled across the 15). BLS suppresses QCEW industry detail for the smallest counties; the treemap, growth quadrant, and firm-formation charts render only the disclosable sectors (Keweenaw, with ~2, is the sparsest), and suppressed cells render "N/A" (map) or "—" (KPI cards), never zeros. The "Largest County Economies" comparison bar stays a top-five comparison (`TOP_N = 5` in `components/top_counties.py`), independent of the detail count.
 
 ## NMU Color Palette
 
@@ -107,7 +107,7 @@ The choropleth uses `MAP_DIVERGING_SCALE` built from the three brand colors (NMU
 ## Key Design Decisions
 
 - **Single page, no sidebar** — scroll-through narrative: map → top-counties → county selector → deep dive.
-- **15 UP counties**; detail embeds for the 5 largest economies.
+- **15 UP counties**; per-county deep dives and detail embeds for all 15.
 - **QCEW data only** for industry sections — BLS QCEW CSV API (no API key needed).
 - **2-digit NAICS** (agglvl_code=74) for all industry analysis.
 - **Ownership codes**: Regional snapshot uses own_code=0 (Total Covered); industry sections use own_code=5 (Private only).
@@ -150,6 +150,8 @@ The dashboard is live at the URL above. Per the June 2026 fork, it is being embe
 ## Change Log
 
 *Entries below the NMU fork describe the upstream South Florida Economic Report and are retained for lineage; the current geography/branding is the Upper Peninsula / NMU.*
+
+**2026-10-09** — Extended per-county deep dives and detail embeds from the 5 largest economies to **all 15 UP counties** (`DETAIL_COUNTY_N = len(COUNTIES)`). Every county now has an inline index tab plus a KPI embed and four chart-section embeds; the build grows from 28 to 78 published pages (2 overview + 15 KPI + 60 chart embeds + `index.html`). The "Largest County Economies" bar stays a top-five comparison. No pipeline change — `build.py` and the a11y gate scale over the county list automatically.
 
 **2026-07-04/05** — Accessibility hardening for NMU hosting. Made WCAG 2.1 AA a standing build requirement (accessibility CSS token layer, per-chart data tables, native-button controls, focus-visible rings); fixed index heading hierarchy (WCAG 1.3.1); deepened gold/link text contrast; darkened choropleth county borders for non-text contrast; added the `npm run a11y` gate and `accessibility.yml` CI check.
 

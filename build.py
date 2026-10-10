@@ -42,11 +42,13 @@ from utils.narratives import narrate_employment_trends, format_industry_list
 DOCS_DIR = Path(__file__).parent / "docs"
 MIN_EMPLOYMENT = 100
 
-# Per-county deep dives are generated for the N largest county economies (by
-# latest employment). All 15 counties × 4 sections would be 60 embeds and an
-# unwieldy 15-tab strip; the largest five keep the static build and the
-# iframe set manageable while covering the bulk of UP employment.
-DETAIL_COUNTY_N = 5
+# Per-county deep dives are generated for every UP county economy (ranked by
+# latest employment). All 15 counties × 4 sections = 60 chart embeds plus 15
+# KPI embeds; the index renders one county tab at a time, so the per-tab weight
+# stays flat. Every county has non-suppressed total-covered data, so each gets a
+# valid KPI card and trends; the smallest (e.g. Keweenaw) have sparse industry
+# detail, and those charts degrade gracefully to their disclosable sectors.
+DETAIL_COUNTY_N = len(COUNTIES)
 
 
 def _detail_counties(df) -> list[str]:

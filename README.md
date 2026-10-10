@@ -54,7 +54,7 @@ gh secret set FRED_API_KEY --repo <owner>/<repo>
 python build.py
 ```
 
-This writes `docs/index.html` plus standalone iframe-embeddable pages under `docs/embeds/`: the interactive county map (`up-map.html`), the largest-county comparison (`up-top-counties.html`), and per-county KPI snapshots and chart pages for the five largest county economies. The GitHub Actions workflow at `.github/workflows/update-data.yml` runs this command on a weekly schedule and commits the refreshed HTML back to the repo.
+This writes `docs/index.html` plus standalone iframe-embeddable pages under `docs/embeds/`: the interactive county map (`up-map.html`), the largest-county comparison (`up-top-counties.html`), and per-county KPI snapshots and chart pages for all 15 UP counties. The GitHub Actions workflow at `.github/workflows/update-data.yml` runs this command on a weekly schedule and commits the refreshed HTML back to the repo.
 
 ## Geography
 
