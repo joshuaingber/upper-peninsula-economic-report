@@ -54,7 +54,7 @@ gh secret set FRED_API_KEY --repo <owner>/<repo>
 python build.py
 ```
 
-This writes `docs/index.html` plus standalone iframe-embeddable pages under `docs/embeds/`: the interactive county map (`up-map.html`), the largest-county comparison (`up-top-counties.html`), and per-county KPI snapshots and chart pages for the five largest county economies. The GitHub Actions workflow at `.github/workflows/update-data.yml` runs this command on a weekly schedule and commits the refreshed HTML back to the repo.
+This writes `docs/index.html` plus standalone iframe-embeddable pages under `docs/embeds/`: the interactive county map (`up-map.html`), the largest-county comparison (`up-top-counties.html`), and per-county KPI snapshots and chart pages for all 15 UP counties. The GitHub Actions workflow at `.github/workflows/update-data.yml` runs this command on a weekly schedule and commits the refreshed HTML back to the repo.
 
 ## Geography
 
@@ -81,6 +81,11 @@ docs/             Published GitHub Pages output
 - **U.S. Bureau of Labor Statistics**, Quarterly Census of Employment and Wages (QCEW). https://www.bls.gov/cew/
 - **Federal Reserve Bank of St. Louis**, FRED economic data — county real GDP (`REALGDPALL{fips}`) and unemployment rate (`LAUCN{fips}0000000003`) series. https://fred.stlouisfed.org/
 - **Internal Revenue Service**, Statistics of Income (SOI) county-to-county migration data. https://www.irs.gov/statistics/soi-tax-stats-migration-data
+
+## Contributing
+
+Fixes and updates are welcome via fork and pull request. See [`CONTRIBUTING.md`](CONTRIBUTING.md)
+for the workflow and the accessibility requirement every change must keep passing.
 
 ## License
 
