@@ -275,6 +275,14 @@ function selectTreemapYear(btn) {
 """
 
 JS = TREEMAP_JS + """
+function renderChart(divId) {
+    var el = document.getElementById(divId);
+    if (!el || el.dataset.rendered || !figureData[divId]) return;
+    el.dataset.rendered = '1';
+    var fig = figureData[divId];
+    Plotly.newPlot(divId, fig.data, fig.layout, {responsive: true, displayModeBar: false});
+}
+
 function showTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
     document.querySelectorAll('.tab-btn').forEach(function(el) {
@@ -285,6 +293,12 @@ function showTab(tabId) {
     var btn = document.querySelector('[data-tab="' + tabId + '"]');
     btn.classList.add('active');
     btn.setAttribute('aria-pressed', 'true');
+    // Render this county's charts the first time its tab is revealed (deferred
+    // from load so all 15 counties don't plot at once), then resize now that
+    // the tab is visible.
+    document.querySelectorAll('#' + tabId + ' .plotly-chart').forEach(function(el) {
+        renderChart(el.id);
+    });
     setTimeout(function() {
         document.querySelectorAll('#' + tabId + ' .plotly-chart').forEach(function(el) {
             if (el.data) Plotly.Plots.resize(el);
@@ -292,9 +306,16 @@ function showTab(tabId) {
     }, 50);
 }
 
+// Plot only the charts visible at load — the overview charts plus the active
+// county tab. Charts inside inactive county tabs render lazily via showTab the
+// first time that county is opened; plotting all 15 counties up front froze the
+// page and blocked tab switching.
 Object.keys(figureData).forEach(function(divId) {
-    var fig = figureData[divId];
-    Plotly.newPlot(divId, fig.data, fig.layout, {responsive: true, displayModeBar: false});
+    var el = document.getElementById(divId);
+    if (!el) return;
+    var tab = el.closest('.tab-content');
+    if (tab && !tab.classList.contains('active')) return;
+    renderChart(divId);
 });
 """
 
