@@ -201,17 +201,23 @@ h1, h2, h3, h4 { color: """ + FAU_BLUE + """; }
 }
 
 /* Tabs */
-.tab-bar { display: flex; flex-wrap: wrap; row-gap: 0.25rem; border-bottom: 2px solid """ + FAU_GRAY + """; margin: 1.5rem 0 0 0; }
+.tab-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.3rem 0.4rem;
+    border-bottom: 2px solid """ + FAU_GRAY + """;
+    margin: 1.5rem 0 0 0;
+}
 .tab-btn {
-    padding: 0.6rem 1.1rem;
+    padding: 0.6rem 0.5rem;
     font-weight: 500;
     color: """ + FAU_DARK_GRAY + """;
     background: none;
     border: none;
     cursor: pointer;
     font-size: 1rem;
+    text-align: center;
     border-bottom: 3px solid transparent;
-    margin-bottom: -2px;
     font-family: inherit;
 }
 .tab-btn:hover { color: """ + FAU_BLUE + """; }
@@ -251,7 +257,9 @@ h1, h2, h3, h4 { color: """ + FAU_BLUE + """; }
 @media (max-width: 768px) {
     .snapshot-row, .chart-row { flex-direction: column; }
     body { padding: 0.5rem 1rem; }
-    .tab-btn { padding: 0.5rem 1rem; font-size: 0.9rem; }
+    /* 3 columns (not 2) keeps the 15 counties in even rows — no orphan. */
+    .tab-bar { grid-template-columns: repeat(3, 1fr); gap: 0.2rem; }
+    .tab-btn { padding: 0.5rem 0.3rem; font-size: 0.85rem; }
 }
 """ + A11Y_CSS
 
