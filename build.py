@@ -201,9 +201,9 @@ h1, h2, h3, h4 { color: """ + FAU_BLUE + """; }
 }
 
 /* Tabs */
-.tab-bar { display: flex; border-bottom: 2px solid """ + FAU_GRAY + """; margin: 1.5rem 0 0 0; }
+.tab-bar { display: flex; flex-wrap: wrap; row-gap: 0.25rem; border-bottom: 2px solid """ + FAU_GRAY + """; margin: 1.5rem 0 0 0; }
 .tab-btn {
-    padding: 0.75rem 1.5rem;
+    padding: 0.6rem 1.1rem;
     font-weight: 500;
     color: """ + FAU_DARK_GRAY + """;
     background: none;
