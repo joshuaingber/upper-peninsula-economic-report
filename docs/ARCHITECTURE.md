@@ -55,7 +55,7 @@ audits/                         # Dated point-in-time data validation reports
 
 ### Main Page — Regional Snapshot
 - Title and subtitle with data quarter badge.
-- **Upper Peninsula at a Glance** — interactive choropleth of all 15 counties shaded by YoY employment growth (`county_map.py`), with a data table below.
+- **Upper Peninsula at a Glance** — interactive choropleth of all 15 counties shaded by YoY employment growth (`county_map.py`), with a data table below. Two small inset maps in NMU Stone sit in the frame's white space: the U.S. (lower left) and Michigan (lower right). Hovering them shows national and statewide totals (employment, establishments, average salary, each with YoY change) for the same quarter as the counties; the same two rows close the data table.
 - **Largest County Economies** — grouped bar comparing YoY employment, establishment, and wage growth for the five largest county economies by employment (`top_counties.py`).
 - **County selector** — a single-select control (`st.selectbox`, default **Marquette**, the UP's largest economy) that drives a per-county deep dive.
 - **KPI card** for the selected county, with two rows:
@@ -121,7 +121,7 @@ The choropleth uses `MAP_DIVERGING_SCALE` built from the three brand colors (NMU
 
 ## Data Pipeline
 
-1. `fetch.py` → downloads BLS CSV per year/quarter/county for the 15 UP counties, caches to `qcew_data.parquet`. Also fetches the U.S. national aggregate (area `US000`, agglvl=10) once to `qcew_national.parquet` for the firm-formation benchmark line.
+1. `fetch.py` → downloads BLS CSV per year/quarter/county for the 15 UP counties, caches to `qcew_data.parquet`. Also fetches the U.S. national aggregate (area `US000`, agglvl=10) once to `qcew_national.parquet` for the firm-formation benchmark line and the map's U.S. inset, and the Michigan statewide total (area `26000`, agglvl=50) to `qcew_michigan.parquet` for the map's Michigan inset (`fetch_state_data()`; benchmarks aligned to the county quarter by `clean.latest_benchmark()`).
 2. `clean.py` → standardizes types, adds `employment`, `avg_annual_wage`, `is_suppressed`, `industry_label`.
 3. `app.py` (or `build.py`) → filters `df[df["county_name"] == county]`, passes to components.
 4. Filter helpers in `clean.py`: `get_total_covered(df)`, `get_naics_sectors(df)`, `get_latest_quarter(df)`; county summaries via `latest_county_summaries(df)`.
@@ -150,6 +150,8 @@ The dashboard is live at the URL above. Per the June 2026 fork, it is being embe
 ## Change Log
 
 *Entries below the NMU fork describe the upstream South Florida Economic Report and are retained for lineage; the current geography/branding is the Upper Peninsula / NMU.*
+
+**2026-11-10** — Added U.S. and Michigan benchmark insets to the "Upper Peninsula at a Glance" map (and its `up-map.html` embed, which the NMU CEEE iframe loads). Insets use a single NMU brand neutral, Stone (`NMU_STONE`, ~3.5:1 on white), so they can't be read as part of the growth scale, carry text labels, and their values are appended to the map's data table. New Michigan statewide fetch (`fetch_state_data`).
 
 **2026-10-09** — Extended per-county deep dives and detail embeds from the 5 largest economies to **all 15 UP counties** (`DETAIL_COUNTY_N = len(COUNTIES)`). Every county now has an inline index tab plus a KPI embed and four chart-section embeds; the build grows from 28 to 78 published pages (2 overview + 15 KPI + 60 chart embeds + `index.html`). The "Largest County Economies" bar stays a top-five comparison. No pipeline change — `build.py` and the a11y gate scale over the county list automatically.
 

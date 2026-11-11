@@ -202,6 +202,8 @@ TREEMAP_DOMAIN_COLORS = {
 # 78 = NAICS 6-digit
 AGGLVL_US_TOTAL = 10       # U.S. national total (only valid for area_fips=US000)
 AGGLVL_US_BY_OWN = 11      # U.S. total by ownership; rows for own_codes 1, 2, 3, 5
+AGGLVL_STATE_TOTAL = 50    # Statewide total covered, own_code=0 (area_fips=SS000)
+MICHIGAN_FIPS = "26000"    # QCEW statewide area code for Michigan (map benchmark inset)
 
 
 # ── External (non-QCEW) data sources ─────────────────────────────────────────

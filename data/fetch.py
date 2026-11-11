@@ -18,12 +18,13 @@ except ImportError:
 
 from data.constants import (
     BLS_BASE_URL, COUNTIES, YEARS, QUARTERS,
-    AGGLVL_US_TOTAL, AGGLVL_US_BY_OWN,
+    AGGLVL_US_TOTAL, AGGLVL_US_BY_OWN, AGGLVL_STATE_TOTAL, MICHIGAN_FIPS,
 )
 
 CACHE_DIR = Path(__file__).parent / "cache"
 CACHE_FILE = CACHE_DIR / "qcew_data.parquet"
 NATIONAL_CACHE_FILE = CACHE_DIR / "qcew_national.parquet"
+STATE_CACHE_FILE = CACHE_DIR / "qcew_michigan.parquet"
 
 
 def _fetch_from_bls() -> pd.DataFrame:
@@ -202,4 +203,43 @@ def fetch_national_data() -> pd.DataFrame:
     if not df.empty:
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         df.to_parquet(NATIONAL_CACHE_FILE, index=False)
+    return df
+
+
+# ── Michigan statewide (26000) fetch ─────────────────────────────────────────
+
+
+def _fetch_state_from_bls(fips: str = MICHIGAN_FIPS) -> pd.DataFrame:
+    """Fetch the statewide total-covered row (own_code=0, agglvl=50) for each quarter.
+
+    Powers the Michigan benchmark inset on the county map. Returns RAW BLS
+    columns (NOT cleaned), like the national fetch.
+    """
+    frames = []
+    print(f"Fetching statewide QCEW ({fips}) from BLS...", flush=True)
+    for year in YEARS:
+        for qtr in QUARTERS:
+            url = BLS_BASE_URL.format(year=year, quarter=qtr, fips=fips)
+            try:
+                resp = requests.get(url, timeout=60)
+                if resp.status_code == 200:
+                    df = pd.read_csv(io.StringIO(resp.text))
+                    frames.append(df[(df["own_code"] == 0) & (df["agglvl_code"] == AGGLVL_STATE_TOTAL)])
+            except Exception:
+                pass
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def fetch_state_data(refresh: bool = False) -> pd.DataFrame:
+    """Load Michigan statewide QCEW totals from cache, or fetch from BLS.
+
+    Like the national cache, this file is not committed: the weekly CI build
+    starts without it and fetches fresh. Pass refresh=True to re-fetch locally.
+    """
+    if STATE_CACHE_FILE.exists() and not refresh:
+        return pd.read_parquet(STATE_CACHE_FILE)
+    df = _fetch_state_from_bls()
+    if not df.empty:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(STATE_CACHE_FILE, index=False)
     return df

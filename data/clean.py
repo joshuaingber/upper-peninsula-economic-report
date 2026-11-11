@@ -144,6 +144,35 @@ def latest_county_summaries(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def latest_benchmark(raw: pd.DataFrame, agglvl: int, year: int, qtr: int,
+                     own_code: int = 0) -> dict:
+    """One benchmark area's (U.S. or a state) total-covered QCEW for a given quarter.
+
+    `raw` is an uncleaned national/state frame from data.fetch. The quarter is
+    passed in so the benchmark matches the county snapshot instead of whatever
+    is newest in the benchmark file. Returns the same field names as
+    latest_county_summaries(); every value is None if that quarter is missing
+    or BLS flagged it non-disclosable.
+    """
+    empty = {k: None for k in ("employment", "qtrly_estabs", "avg_annual_wage",
+                               "oty_emp_pct", "oty_estab_pct", "oty_wage_pct")}
+    if raw is None or raw.empty:
+        return empty
+    rows = raw[(raw["own_code"] == own_code) & (raw["agglvl_code"] == agglvl)
+               & (raw["year"] == year) & (raw["qtr"] == qtr)]
+    if rows.empty or str(rows.iloc[0].get("disclosure_code") or "").strip() == "N":
+        return empty
+    r = rows.iloc[0]
+    return {
+        "employment": r["month3_emplvl"],
+        "qtrly_estabs": r["qtrly_estabs"],
+        "avg_annual_wage": r["avg_wkly_wage"] * 52,
+        "oty_emp_pct": r.get("oty_month3_emplvl_pct_chg"),
+        "oty_estab_pct": r.get("oty_qtrly_estabs_pct_chg"),
+        "oty_wage_pct": r.get("oty_avg_wkly_wage_pct_chg"),
+    }
+
+
 def get_growth_quadrant_data(df: pd.DataFrame) -> pd.DataFrame:
     """Latest-quarter NAICS sectors with valid YoY employment + wage growth rates."""
     sectors = get_latest_quarter(get_naics_sectors(df, own_code=5))

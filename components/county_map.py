@@ -17,8 +17,11 @@ import plotly.graph_objects as go
 import pandas as pd
 import requests
 
-from data.clean import latest_county_summaries
-from data.constants import COUNTIES, MAP_DIVERGING_SCALE, PLOTLY_FONT
+from data.clean import latest_benchmark, latest_county_summaries
+from data.constants import (
+    AGGLVL_STATE_TOTAL, AGGLVL_US_TOTAL, COUNTIES, MAP_DIVERGING_SCALE,
+    NMU_DARK_GRAY, NMU_STONE, PLOTLY_FONT,
+)
 from utils.formatting import fmt_number, fmt_currency
 from utils.narratives import source_citation
 
@@ -28,8 +31,21 @@ METHODOLOGY_NOTE = (
     "employment (latest published quarter vs. the same quarter one year prior), "
     "per BLS QCEW. Hover a county for its employment, establishment count, and "
     "average salary, each with its over-the-year change. Counties whose data BLS "
-    "suppresses for confidentiality appear uncolored."
+    "suppresses for confidentiality appear uncolored. The small stone-colored U.S. and "
+    "Michigan maps give national and statewide totals for comparison."
 )
+
+# Benchmark insets: display name -> (hover title, state codes drawn, label under inset)
+BENCHMARK_LABELS = {
+    "United States": "United States",
+    "Michigan": "Michigan (statewide)",
+}
+_US_STATES = [
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL",
+    "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE",
+    "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD",
+    "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+]
 
 _GEOJSON_URL = (
     "https://raw.githubusercontent.com/plotly/datasets/master/"
@@ -81,24 +97,101 @@ def _fmt_signed_pct(val) -> str:
     return f"{sign}{abs(val):.1f}%"
 
 
-def build_figure(summary: pd.DataFrame, geojson: dict) -> go.Figure:
+def _hover_row(title: str, r, suppressed: bool = False) -> list[str]:
+    """Pre-formatted hover fields so missing/suppressed cells read "N/A"."""
+    def get(k):
+        return None if suppressed else r.get(k)
+    return [
+        title,
+        fmt_number(get("employment")),
+        _fmt_signed_pct(get("oty_emp_pct")),
+        fmt_number(get("qtrly_estabs")),
+        _fmt_signed_pct(get("oty_estab_pct")),
+        fmt_currency(get("avg_annual_wage")),
+        _fmt_signed_pct(get("oty_wage_pct")),
+    ]
+
+
+_HOVER = (
+    "<b>%{customdata[0]}</b><br>"
+    "Employment: %{customdata[1]} (%{customdata[2]} YoY)<br>"
+    "Establishments: %{customdata[3]} (%{customdata[4]} YoY)<br>"
+    "Average salary: %{customdata[5]} (%{customdata[6]} YoY)"
+    "<extra></extra>"
+)
+
+
+def load_benchmarks(summary: pd.DataFrame) -> dict | None:
+    """U.S. and Michigan totals for the same quarter as the county snapshot.
+
+    Returns {"United States": {...}, "Michigan": {...}} (field names as in
+    latest_county_summaries), or None if there is no county snapshot.
+    """
+    from data.fetch import fetch_national_data, fetch_state_data
+
+    if summary is None or summary.empty:
+        return None
+    latest = summary.sort_values(["year", "qtr"]).iloc[-1]
+    year, qtr = int(latest["year"]), int(latest["qtr"])
+    return {
+        "United States": latest_benchmark(fetch_national_data(), AGGLVL_US_TOTAL, year, qtr),
+        "Michigan": latest_benchmark(fetch_state_data(), AGGLVL_STATE_TOTAL, year, qtr),
+    }
+
+
+def _add_benchmark_insets(fig: go.Figure, benchmarks: dict) -> None:
+    """Two small NMU Stone maps (U.S., Michigan) in the main map's white space.
+
+    A single NMU brand neutral (NMU_STONE, ~3.5:1 on white, clears the 3:1
+    non-text minimum) keeps them visibly separate from the red-gold-green growth scale; a text label names each one,
+    and the same values are in the map's data table (WCAG 1.1.1 / 1.4.1).
+    """
+    # (name, locations, geo id, domain x, domain y, label x, label y, label anchor)
+    insets = [
+        ("United States", _US_STATES, "geo2", [0.0, 0.2], [0.05, 0.29], 0.03, 0.04, "left"),
+        ("Michigan", ["MI"], "geo3", [0.66, 0.84], [0.05, 0.32], 0.75, 0.04, "center"),
+    ]
+    for name, locs, geo_id, dx, dy, lx, ly, anchor in insets:
+        row = _hover_row(BENCHMARK_LABELS[name], benchmarks.get(name) or {})
+        fig.add_trace(go.Choropleth(
+            locationmode="USA-states",
+            locations=locs,
+            z=[1] * len(locs),
+            colorscale=[[0, NMU_STONE], [1, NMU_STONE]],
+            showscale=False,
+            marker_line_color="white",
+            marker_line_width=0.4,
+            customdata=[row] * len(locs),
+            hovertemplate=_HOVER,
+            geo=geo_id,
+            name=BENCHMARK_LABELS[name],
+        ))
+        geo = dict(
+            domain=dict(x=dx, y=dy), visible=False, bgcolor="rgba(0,0,0,0)",
+            showlakes=True, lakecolor="white", projection_type="albers usa",
+        )
+        if name == "Michigan":
+            geo.update(scope="usa", fitbounds="locations")
+        else:
+            geo.update(scope="usa")
+        fig.update_layout(**{geo_id: geo})
+        fig.add_annotation(
+            text=name,
+            x=lx, y=ly, xref="paper", yref="paper", xanchor=anchor, yanchor="top",
+            showarrow=False, font=dict(size=12, color=NMU_DARK_GRAY),
+        )
+
+
+def build_figure(summary: pd.DataFrame, geojson: dict, benchmarks: dict | None = None) -> go.Figure:
     """Choropleth of UP counties shaded by OTY employment growth.
 
     `summary` is the output of latest_county_summaries(); `geojson` is the
-    UP-filtered FeatureCollection from _load_geojson().
+    UP-filtered FeatureCollection from _load_geojson(). If `benchmarks` (from
+    load_benchmarks) is given, small U.S. and Michigan maps are added whose
+    hovers show national and statewide totals.
     """
-    # Pre-format every hover field in Python so suppressed/NaN cells read "N/A"
-    # rather than rendering a broken number via the hovertemplate.
     customdata = [
-        [
-            f"{r['county_name']} County",
-            "N/A" if r["is_suppressed"] else fmt_number(r["employment"]),
-            _fmt_signed_pct(None if r["is_suppressed"] else r["oty_emp_pct"]),
-            "N/A" if r["is_suppressed"] else fmt_number(r["qtrly_estabs"]),
-            _fmt_signed_pct(None if r["is_suppressed"] else r["oty_estab_pct"]),
-            "N/A" if r["is_suppressed"] else fmt_currency(r["avg_annual_wage"]),
-            _fmt_signed_pct(None if r["is_suppressed"] else r["oty_wage_pct"]),
-        ]
+        _hover_row(f"{r['county_name']} County", r, bool(r["is_suppressed"]))
         for _, r in summary.iterrows()
     ]
 
@@ -131,13 +224,7 @@ def build_figure(summary: pd.DataFrame, geojson: dict) -> go.Figure:
             thickness=14,
             len=0.7,
         ),
-        hovertemplate=(
-            "<b>%{customdata[0]}</b><br>"
-            "Employment: %{customdata[1]} (%{customdata[2]} YoY)<br>"
-            "Establishments: %{customdata[3]} (%{customdata[4]} YoY)<br>"
-            "Average salary: %{customdata[5]} (%{customdata[6]} YoY)"
-            "<extra></extra>"
-        ),
+        hovertemplate=_HOVER,
     ))
 
     fig.update_geos(
@@ -151,10 +238,12 @@ def build_figure(summary: pd.DataFrame, geojson: dict) -> go.Figure:
         height=520,
         margin=dict(t=10, b=10, l=10, r=10),
         paper_bgcolor="white",
-        geo=dict(bgcolor="white"),
+        geo=dict(bgcolor="white", domain=dict(x=[0, 1], y=[0, 1])),
         dragmode=False,
         font=dict(family=PLOTLY_FONT),
     )
+    if benchmarks:
+        _add_benchmark_insets(fig, benchmarks)
     return fig
 
 
@@ -185,7 +274,7 @@ def render(df: pd.DataFrame):
             f"Hover any county for its full QCEW snapshot."
         )
 
-    fig = build_figure(summary, geojson)
+    fig = build_figure(summary, geojson, load_benchmarks(summary))
     st.plotly_chart(fig, use_container_width=True, config={"scrollZoom": False})
     st.caption(source_citation("BLS QCEW", "https://www.bls.gov/cew/", "Quarterly"))
     st.caption(f"_{METHODOLOGY_NOTE}_")

@@ -542,8 +542,23 @@ def _data_table_html(caption, columns, rows):
     )
 
 
-def _map_table_html(summary):
-    """Data table for the county choropleth (one row per county)."""
+def _load_benchmarks(summary):
+    """U.S./Michigan totals for the map insets; None (insets omitted) on failure."""
+    from components.county_map import load_benchmarks
+    try:
+        return load_benchmarks(summary)
+    except Exception as exc:  # benchmark fetch must never break the build
+        print(f"WARNING: map benchmarks unavailable ({exc}); building map without insets")
+        return None
+
+
+def _map_table_html(summary, benchmarks=None):
+    """Data table for the county choropleth (one row per county).
+
+    If `benchmarks` (components.county_map.load_benchmarks) is given, Michigan
+    and United States rows follow the counties, so the inset maps' hover-only
+    values are also in the table (WCAG 1.1.1).
+    """
     ordered = summary.sort_values("employment", ascending=False, na_position="last")
     rows = [
         (
@@ -555,9 +570,22 @@ def _map_table_html(summary):
         )
         for _, r in ordered.iterrows()
     ]
+    from components.county_map import BENCHMARK_LABELS
+    for name in ("Michigan", "United States"):
+        b = (benchmarks or {}).get(name)
+        if b is None:
+            continue
+        rows.append((
+            BENCHMARK_LABELS[name],
+            fmt_number(b["employment"]),
+            fmt_number(b["qtrly_estabs"]),
+            fmt_currency(b["avg_annual_wage"]),
+            _pct_str(b["oty_emp_pct"]) if b["oty_emp_pct"] is not None else "—",
+        ))
     return _data_table_html(
-        "Upper Peninsula counties — latest-quarter employment, establishments, "
-        "average salary, and year-over-year employment growth",
+        "Upper Peninsula counties, with Michigan and U.S. totals for comparison — "
+        "latest-quarter employment, establishments, average salary, and "
+        "year-over-year employment growth",
         ["County", "Employment", "Establishments", "Average Salary",
          "YoY Employment Growth"],
         rows,
@@ -1084,19 +1112,23 @@ def build_html(df):
     summary = latest_county_summaries(df)
     geojson = _load_geojson()
     if not summary.empty and geojson is not None:
-        figures["up-county-map"] = _fig_json(_map_fig(summary, geojson))
+        benchmarks = _load_benchmarks(summary)
+        figures["up-county-map"] = _fig_json(_map_fig(summary, geojson, benchmarks))
         map_aria = (
             "Choropleth map of the 15 Upper Peninsula counties shaded by "
-            "year-over-year employment growth."
+            "year-over-year employment growth, with small inset maps of Michigan "
+            "and the United States giving statewide and national totals."
         )
         map_html = (
             '<div class="section"><h2>Upper Peninsula at a Glance</h2>'
             '<figure class="chart-figure"><figcaption>Counties are shaded by '
             'year-over-year employment growth (latest published QCEW quarter). '
             'Hover any county for its employment, establishment count, and average '
-            'salary.</figcaption>'
+            'salary. Hover the small U.S. and Michigan maps for national and '
+            'statewide totals; both also appear at the bottom of the data table.'
+            '</figcaption>'
             f'{_chart_div("up-county-map", map_aria)}</figure>'
-            f'{_map_table_html(summary)}{SOURCE}</div>'
+            f'{_map_table_html(summary, benchmarks)}{SOURCE}</div>'
         )
     else:
         map_html = (
@@ -1257,21 +1289,25 @@ def write_embeds(df):
     summary = latest_county_summaries(df)
     geojson = _load_geojson()
     if not summary.empty and geojson is not None:
+        benchmarks = _load_benchmarks(summary)
         map_aria = (
             "Choropleth map of the 15 Upper Peninsula counties shaded by "
-            "year-over-year employment growth."
+            "year-over-year employment growth, with small inset maps of Michigan "
+            "and the United States giving statewide and national totals."
         )
         map_body = (
             '<div class="section"><h2>Upper Peninsula at a Glance</h2>'
             '<figure class="chart-figure"><figcaption>Counties shaded by '
-            'year-over-year employment growth (latest published QCEW quarter).'
+            'year-over-year employment growth (latest published QCEW quarter). '
+            'Hover the small U.S. and Michigan maps for national and statewide '
+            'totals; both also appear at the bottom of the data table.'
             '</figcaption>'
             f'{_chart_div("up-county-map", map_aria)}</figure>'
-            f'{_map_table_html(summary)}</div>'
+            f'{_map_table_html(summary, benchmarks)}</div>'
         )
         (embeds_dir / "up-map.html").write_text(
             wrap_as_embed(
-                map_body, {"up-county-map": _fig_json(_map_fig(summary, geojson))},
+                map_body, {"up-county-map": _fig_json(_map_fig(summary, geojson, benchmarks))},
                 "Upper Peninsula — County Map",
             ),
             encoding="utf-8",

@@ -49,7 +49,10 @@ Media criteria (WCAG 1.2.x, audio/video) are not applicable — the site has no 
 - **1.4.11 Non-text Contrast (AA)** — Structural UI borders, focus rings, and data-bearing chart
   marks (lines, bars, bubbles) meet ≥ 3:1 against adjacent color. Gold and sand chart series are
   darkened (`#B8860B`, `#9C7A3C`) to clear 3:1; treemap tiles use a dark palette so white labels
-  clear 4.5:1.
+  clear 4.5:1. The county map's U.S. and Michigan benchmark insets use one brand neutral,
+  NMU Stone (`#7E8C84`, ~3.5:1 on white, clearing the 3:1 non-text minimum), which sits outside the
+  red–gold–green growth scale. Each carries a text label and repeats its hover values as the last two
+  rows of the map's data table, so the fill carries no meaning on its own (1.4.1).
 
 ### Operable
 
