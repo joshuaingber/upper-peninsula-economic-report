@@ -16,7 +16,7 @@ Base URL: `https://joshuaingber.github.io/upper-peninsula-economic-report/embeds
 
 ## Available Embeds
 
-There are 77 embeds: 2 region-wide overviews, plus a KPI snapshot and 4 chart sections for each of
+There are 107 embeds: 2 region-wide overviews, plus a KPI snapshot and 6 chart sections for each of
 the 15 UP counties. The smallest counties have sparser industry charts because BLS suppresses QCEW
 detail for confidentiality (Keweenaw is the sparsest); the charts render only the disclosable
 sectors, and every county still has a full KPI snapshot and employment/salary trends.
@@ -43,14 +43,16 @@ sectors, and every county still has a full KPI snapshot and employment/salary tr
 | Ontonagon KPI Snapshot | `kpi-ontonagon.html` | 320 px | 360 px |
 | Keweenaw KPI Snapshot | `kpi-keweenaw.html` | 320 px | 360 px |
 
-Each county has the same four chart sections. Replace `<county>` with one of `marquette`, `delta`,
+Each county has the same six chart sections. Replace `<county>` with one of `marquette`, `delta`,
 `dickinson`, `houghton`, `chippewa`, `menominee`, `gogebic`, `mackinac`, `iron`, `baraga`,
 `schoolcraft`, `alger`, `luce`, `ontonagon`, `keweenaw`:
 
 | Section | Path (append to base URL) | Suggested height | Min. width |
 |---|---|---:|---:|
 | Employment & Salary Trends | `<county>/trends.html` | 600 px | 700 px |
+| Housing Median Value Trends | `<county>/housing-median-value.html` | 600 px | 600 px |
 | Workforce Composition (treemap) | `<county>/workforce-composition.html` | 600 px | 600 px |
+| AI Vulnerability by Sector (weighted histogram) | `<county>/ai-risk-score.html` | 600 px | 600 px |
 | Industry Landscape (growth quadrant) | `<county>/industry-landscape.html` | 700 px | 600 px |
 | Firm Openings & Closings | `<county>/firm-formation.html` | 600 px | 600 px |
 

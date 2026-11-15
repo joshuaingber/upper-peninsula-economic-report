@@ -1,8 +1,12 @@
+# QCEW fetcher: downloads quarterly county-level (and U.S. national) employment
+# and wage data from BLS and caches it locally as parquet.
 """
-Fetch QCEW data from BLS CSV API and cache locally as parquet.
-Since QCEW data updates quarterly (with a 6-9 month lag), there's no reason
-to hit the API on every app load. Data is fetched once and saved to disk;
-use the "Refresh Data" button in the sidebar to pull new quarters.
+Data comes from BLS's per-area QCEW CSV endpoint (BLS_BASE_URL), one
+county-quarter file at a time. The files are combined into one DataFrame and
+saved under data/cache/. Later loads read that cache instead of calling the
+API, because QCEW updates quarterly with a 6-9 month lag, so there is no
+reason to hit BLS on every app load. To pull new quarters, call refresh_data()
+or delete the cache file.
 """
 from __future__ import annotations
 import io
@@ -11,6 +15,8 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+# Streamlit is optional: when it's installed we show a progress bar, otherwise
+# progress goes to the console.
 try:
     import streamlit as st
 except ImportError:
@@ -21,14 +27,27 @@ from data.constants import (
     AGGLVL_US_TOTAL, AGGLVL_US_BY_OWN, AGGLVL_STATE_TOTAL, MICHIGAN_FIPS,
 )
 
+# Sets the cache locations for the county data and the U.S. national data.
 CACHE_DIR = Path(__file__).parent / "cache"
 CACHE_FILE = CACHE_DIR / "qcew_data.parquet"
 NATIONAL_CACHE_FILE = CACHE_DIR / "qcew_national.parquet"
 STATE_CACHE_FILE = CACHE_DIR / "qcew_michigan.parquet"
 
 
+# Downloads every county-quarter CSV from BLS and returns them as one
+# DataFrame with an added county_name column. Returns an empty DataFrame if
+# nothing could be fetched.
 def _fetch_from_bls() -> pd.DataFrame:
-    """Fetch all county-quarter CSVs from BLS and return a consolidated DataFrame."""
+    """Request one CSV per county, year, and quarter, then concatenate them.
+
+    Loops over COUNTIES x YEARS x QUARTERS, building each URL from
+    BLS_BASE_URL with a 30-second timeout. A response with status 200 is
+    parsed with pd.read_csv and tagged with its county_name. Any other status,
+    or any exception, is skipped silently. Progress is shown with a Streamlit
+    progress bar when Streamlit is available, otherwise as a console counter.
+    If no file was fetched, it reports an error (st.error or print) and
+    returns an empty DataFrame.
+    """
     frames = []
     total = len(COUNTIES) * len(YEARS) * len(QUARTERS)
     done = 0
@@ -79,21 +98,30 @@ def _fetch_from_bls() -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
+# Saves the county DataFrame to the local parquet cache.
 def _save_cache(df: pd.DataFrame) -> None:
-    """Save DataFrame to local parquet cache."""
+    """Create CACHE_DIR if needed, then write df to CACHE_FILE without the index."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     df.to_parquet(CACHE_FILE, index=False)
 
 
+# Returns the cached county DataFrame, or None if there is no cache yet.
 def _load_cache() -> pd.DataFrame | None:
-    """Load cached parquet if it exists."""
+    """Read CACHE_FILE with pd.read_parquet if the file exists, else return None."""
     if CACHE_FILE.exists():
         return pd.read_parquet(CACHE_FILE)
     return None
 
 
+# Returns the county QCEW data, using the cache when it exists and fetching
+# from BLS only when it doesn't.
 def fetch_all_data() -> pd.DataFrame:
-    """Load QCEW data from local cache, or fetch from BLS if no cache exists."""
+    """Return the cache if present; otherwise fetch from BLS and cache the result.
+
+    There is no freshness check: any existing cache is returned as is. When
+    there is no cache, it calls _fetch_from_bls and saves the result only if
+    it is non-empty, so a failed fetch is never cached.
+    """
     cached = _load_cache()
     if cached is not None:
         return cached
@@ -105,8 +133,11 @@ def fetch_all_data() -> pd.DataFrame:
     return df
 
 
+# Forces a fresh download of the county data and overwrites the cache.
 def refresh_data() -> pd.DataFrame:
-    """Force re-fetch from BLS and update the local cache.
+    """Call _fetch_from_bls and save the result to the cache if it is non-empty.
+
+    A failed refresh (empty result) leaves the existing cache untouched.
 
     NOTE: this only refreshes the per-county cache. The national cache
     (qcew_national.parquet) is left untouched because no UI currently
@@ -122,17 +153,22 @@ def refresh_data() -> pd.DataFrame:
 # ── National (US000) fetch ───────────────────────────────────────────────────
 
 
+# Downloads U.S. national totals (area code US000) for each year and quarter,
+# keeping two slices: all-ownership total covered employment, and private only.
+# The private slice powers the firm-formation benchmark so it is apples-to-
+# apples with the county's private-only industry data. Returns raw BLS columns,
+# or an empty DataFrame if nothing could be fetched.
 def _fetch_national_from_bls() -> pd.DataFrame:
-    """Fetch US000 (national totals) for each year/quarter.
+    """Request one US000 CSV per year and quarter, filter each, and concatenate.
 
-    Returns RAW BLS columns filtered to two ownership slices per quarter:
-      - (own_code=0, agglvl=AGGLVL_US_TOTAL=10) — all-ownership total covered
-      - (own_code=5, agglvl=AGGLVL_US_BY_OWN=11) — private only
-    The private slice powers the firm-formation benchmark so it is apples-
-    to-apples with the county's private-only industry data.
+    Loops over YEARS x QUARTERS with a 60-second timeout, since the national
+    file is larger. Each CSV is filtered to rows where (own_code=0 and
+    agglvl_code=AGGLVL_US_TOTAL, i.e. 10) or (own_code=5 and
+    agglvl_code=AGGLVL_US_BY_OWN, i.e. 11). Failed requests are skipped
+    silently, and progress is shown the same way as in _fetch_from_bls.
 
-    Do NOT pass this through clean() — clean() requires the `county_name`
-    column added by the per-county fetcher.
+    Do NOT pass the result through clean(): clean() requires the county_name
+    column that only the per-county fetcher adds.
     """
     frames = []
     total = len(YEARS) * len(QUARTERS)
@@ -177,18 +213,19 @@ def _fetch_national_from_bls() -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
+# Returns the national QCEW totals, using the cache when it exists and fetching
+# from BLS otherwise. Returns raw BLS columns (not cleaned) for the total and
+# private slices. Use data.clean.get_national_qoq_pct(df, own_code=...) to
+# derive the quarter-over-quarter percent change for either slice.
 def fetch_national_data() -> pd.DataFrame:
-    """Load national QCEW totals from cache, or fetch from BLS if no cache exists.
+    """Load the national cache, re-fetching it if it is stale, or fetch if absent.
 
-    Returns raw BLS columns (NOT cleaned) for two ownership slices:
-    (own_code=0, agglvl=10) — total covered — and (own_code=5, agglvl=11)
-    — private. The private slice powers the firm-formation benchmark.
-    Use data.clean.get_national_qoq_pct(df, own_code=...) to derive the
-    QoQ percent change series for either slice.
-
-    Self-migrates: if a pre-existing cache predates the multi-ownership
-    filter (only own_code=0 present), the cache is re-fetched in place
-    so consumers downstream don't silently degrade on a stale schema.
+    If the cache file exists, it is read. A cache that has an own_code column
+    but no own_code=5 rows predates the multi-ownership filter, so it is
+    re-fetched and overwritten in place; if that re-fetch comes back empty,
+    the old cache is returned instead. This keeps downstream code from
+    silently degrading on a stale schema. If there is no cache file, it calls
+    _fetch_national_from_bls and saves the result only if it is non-empty.
     """
     if NATIONAL_CACHE_FILE.exists():
         df = pd.read_parquet(NATIONAL_CACHE_FILE)

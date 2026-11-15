@@ -41,3 +41,24 @@ def narrate_employment_trends(
         f"went from {fmt_number(start_empl)} to {fmt_number(end_empl)}, "
         f"{direction} of {fmt_pct(abs(change_pct))}."
     )
+
+def narrate_median_house_value_trends(
+    county_name: str,
+    start_year: int,
+    end_year: int,
+    start_value: float,
+    end_value: float,
+) -> str:
+    """Describe median house value change over a multi-year period."""
+    if start_value is None or end_value is None or start_value == 0:
+        return (
+            f"Between {start_year} and {end_year}, median house value data for "
+            f"{county_name} is incomplete."
+        )
+    change_pct = (end_value - start_value) / start_value * 100
+    direction = "an increase" if change_pct >= 0 else "a decrease"
+    return (
+        f"Between {start_year} and {end_year}, the median house value in {county_name} "
+        f"went from {fmt_number(start_value)} to {fmt_number(end_value)}, "
+        f"{direction} of {fmt_pct(abs(change_pct))}."
+    )

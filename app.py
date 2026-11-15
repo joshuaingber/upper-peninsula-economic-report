@@ -1,3 +1,6 @@
+# If you want to open the app locally, run `streamlit run app.py` in the terminal. 
+# You may need to install dependencies first with `pip install -r requirements.txt`.
+
 """
 Upper Peninsula Regional Economic Report
 Built with Streamlit + Plotly using BLS QCEW data.
@@ -12,14 +15,18 @@ import pandas as pd
 from data.fetch import fetch_all_data
 from data.fetch_fred import fetch_real_gdp, fetch_unemployment_rate
 from data.fetch_irs_migration import fetch_irs_migration
+from data.fetch_Census_housing import get_up_housing
+from data.analysis import (
+    merge_mit_ai_safety_sector_rating_with_qcew
+)
 from data.clean import (
     clean, get_total_covered, get_latest_quarter,
-    latest_gdp_with_growth, latest_unrate_with_yoy, latest_irs_net,
+    latest_gdp_with_growth, latest_unrate_with_yoy, latest_irs_net, clean_mit_ai_safety_sector_rating, clean_qcew_data_for_AI_risk_embed
 )
 from data.constants import (
     FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_GRAY, FAU_ELECTRIC_BLUE,
     FAU_SKY_BLUE, COUNTY_COLORS, COUNTIES,
-    NMU_FONT_FAMILY, GOOGLE_FONTS_IMPORT,
+    NMU_FONT_FAMILY, GOOGLE_FONTS_IMPORT, SECTOR_RATING_CSV_PATH,
 )
 from utils.formatting import fmt_number, fmt_currency
 from utils.narratives import source_citation
@@ -30,6 +37,8 @@ from components.employment_trends import render as render_trends
 from components.growth_quadrant import render as render_growth_quadrant
 from components.firm_formation import render as render_firm_formation
 from components.employment_treemap import render as render_employment_treemap
+from components.housing_median_value_tseries import render as render_housing_median_value_tseries
+from components.county_AI_risk_score import render_county_ai_risk_score_hist
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -189,6 +198,21 @@ if raw_df.empty:
 
 df = clean(raw_df)
 
+# ── Load secondary data sources ─────────────────────────────────────────────
+
+# up_housing_df
+try:
+    housing_df = get_up_housing()
+except Exception as e:
+    st.warning(f"Housing data could not be loaded: {e}")
+    housing_df = pd.DataFrame()
+
+# MIT AI Safety Sector Rating data
+mit_ai_safety_df = clean_mit_ai_safety_sector_rating(pd.read_csv(SECTOR_RATING_CSV_PATH))
+qcew_data_for_ai_risk_df = clean_qcew_data_for_AI_risk_embed(raw_df)
+
+mit_ai_risk_merged_df = merge_mit_ai_safety_sector_rating_with_qcew(mit_ai_safety_df, qcew_data_for_ai_risk_df)
+
 # Secondary KPI data sources — fetched once at module load (cache-hot after the
 # first run). Each loader returns an empty DataFrame on missing key/network
 # failure so the secondary KPI cells degrade individually to "—".
@@ -207,9 +231,15 @@ def _secondary_for(county_name: str) -> dict:
 
 # ── Regional Snapshot ─────────────────────────────────────────────────────────
 
-def _county_snapshot_card(county_df: pd.DataFrame, county_name: str, color: str,
-                          secondary=None):
+def _county_snapshot_card(
+    county_df: pd.DataFrame,
+    county_housing_df: pd.DataFrame,
+    county_name: str,
+    color: str,
+    secondary=None,
+):
     """Render a styled KPI card for one county (primary + optional secondary row)."""
+    # Get the latest quarter's data for the county, or show a "no data" card if missing.
     totals = get_total_covered(county_df)
     latest = get_latest_quarter(totals)
 
@@ -229,6 +259,27 @@ def _county_snapshot_card(county_df: pd.DataFrame, county_name: str, color: str,
     estabs = fmt_number(row["qtrly_estabs"])
     wage = fmt_currency(row["avg_annual_wage"])
 
+    housing_value = "—"
+    housing_med_pct = None
+    if not county_housing_df.empty:
+        housing_rows = county_housing_df.sort_values("year")
+        latest_housing = housing_rows.iloc[-1]
+        latest_value = latest_housing["median_home_value"]
+        if pd.notna(latest_value):
+            housing_value = fmt_currency(latest_value)
+
+        prior_housing = housing_rows[
+            housing_rows["year"] == latest_housing["year"] - 1
+        ]
+        if not prior_housing.empty:
+            prior_value = prior_housing.iloc[-1]["median_home_value"]
+            if (
+                pd.notna(latest_value)
+                and pd.notna(prior_value)
+                and prior_value != 0
+            ):
+                housing_med_pct = (latest_value - prior_value) / prior_value * 100
+
     empl_pct = row.get("oty_month3_emplvl_pct_chg")
     estab_pct = row.get("oty_qtrly_estabs_pct_chg")
     wage_pct = row.get("oty_avg_wkly_wage_pct_chg")
@@ -243,7 +294,7 @@ def _county_snapshot_card(county_df: pd.DataFrame, county_name: str, color: str,
     secondary = secondary or {}
     secondary_html = _secondary_row_html(secondary)
 
-    st.markdown(f"""
+    st.html(f"""
     <div class="county-card" style="border-left-color: {color};">
         <h3 style="color: {color};">{county_name} County</h3>
         <div class="kpi-row">
@@ -262,10 +313,15 @@ def _county_snapshot_card(county_df: pd.DataFrame, county_name: str, color: str,
                 <div class="kpi-value">{wage}</div>
                 {_delta_html(wage_pct)}
             </div>
+            <div class="kpi-item">
+                <div class="kpi-label">Median Home Value</div>
+                <div class="kpi-value">{housing_value}</div>
+                {_delta_html(housing_med_pct)}
+            </div>
         </div>
-        {secondary_html}
+{secondary_html}
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
 
 def _secondary_row_html(secondary: dict) -> str:
@@ -340,7 +396,7 @@ render_top_counties(df)
 
 # ── County Detail (selectable) ────────────────────────────────────────────────
 
-def _render_county_tab(county_df: pd.DataFrame, county_name: str):
+def _render_county_tab(county_df: pd.DataFrame, county_name: str, housing_df: pd.DataFrame):
     """Render the full QCEW analysis for a single county."""
     if county_df.empty:
         st.warning(f"No data available for {county_name} County.")
@@ -349,9 +405,17 @@ def _render_county_tab(county_df: pd.DataFrame, county_name: str):
     # Employment Trends
     render_trends(county_df)
 
+    # Housing Median Value Trends
+    st.divider()
+    render_housing_median_value_tseries(housing_df)
+
     # Workforce Composition
     st.divider()
     render_employment_treemap(county_df)
+
+    # AI Risk Score Distribution weighted by number of workers in each sector
+    st.divider()
+    render_county_ai_risk_score_hist(mit_ai_risk_merged_df, county_name)
 
     # Industry Landscape
     st.divider()
@@ -377,9 +441,14 @@ selected_county = st.selectbox(
 )
 
 selected_df = df[df["county_name"] == selected_county]
+selected_housing_df = housing_df[housing_df["county_name"] == selected_county]
 selected_color = COUNTY_COLORS.get(selected_county, FAU_BLUE)
 _county_snapshot_card(
-    selected_df, selected_county, selected_color, _secondary_for(selected_county)
+    county_df=selected_df,
+    county_housing_df=selected_housing_df,
+    county_name=selected_county,
+    color=selected_color,
+    secondary=_secondary_for(selected_county),
 )
 st.caption(
     "Net Migration reflects IRS SOI county-to-county filings (Total Migration-US "
@@ -390,7 +459,7 @@ st.caption(
     "suppress or omit a series for confidentiality."
 )
 
-_render_county_tab(selected_df, selected_county)
+_render_county_tab(selected_df, selected_county, selected_housing_df)
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()

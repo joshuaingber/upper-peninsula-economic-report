@@ -45,7 +45,10 @@ def get_top_counties(df: pd.DataFrame, n: int = TOP_N) -> pd.DataFrame:
 
 def build_figure(top: pd.DataFrame) -> go.Figure:
     """Grouped bar chart: one group per county, one bar per OTY growth metric."""
-    counties = top["county_name"] + " County"
+    counties = top["county_name"].where(
+    top["county_name"] == "Upper Peninsula",
+    top["county_name"] + " County"
+    )
 
     fig = go.Figure()
     for col, label, color in _METRICS:

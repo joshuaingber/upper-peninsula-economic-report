@@ -1,15 +1,17 @@
+# FRED client: fetches county-level real GDP and unemployment-rate series for
+# the Upper Peninsula counties, with a committed parquet cache as a fallback.
 """
-FRED API client for county-level real GDP and unemployment series.
+Reads FRED_API_KEY from the environment (a local .env is loaded if
+python-dotenv is installed).
 
-Reads FRED_API_KEY from an environment variable. If missing or any call
-fails, returns an empty DataFrame so the secondary KPI row gracefully
-degrades to "—".
-
-The per-county series are fetched back-to-back, so requests are spaced out
-and retried with exponential backoff that honors FRED's 429 ``Retry-After``
-header to stay under FRED's burst rate limit (see ``_fetch_one`` and
-``_fetch_series_set``).
+Each series is downloaded by _fred_observations and retried with exponential
+backoff by _fetch_one. _fetch_series_set spaces the per-county requests out to
+stay under FRED's burst rate limit. _fetch_with_cache_fallback saves each
+successful fetch to a parquet cache and reads it back if a fresh fetch fails.
+If there is neither fresh data nor a cache, the public fetch functions return
+an empty DataFrame so the secondary KPI row degrades to "—".
 """
+# Imports
 from __future__ import annotations
 
 import io
@@ -32,13 +34,26 @@ except ImportError:
 
 from data.constants import FRED_API_BASE, FRED_GDP_SERIES, FRED_UNRATE_SERIES
 
-CACHE_DIR = Path(__file__).parent / "cache"
+# Sets the cache paths for the two FRED series we fetch.
+# The cache is a fallback, not a short-circuit: we always try a fresh fetch
+# first, and only fall back to the last-good cache if that fails. Fresh fetches
+# overwrite the cache, so the fallback stays current between outages.
+from data.constants import CACHE_DIR
 GDP_CACHE = CACHE_DIR / "qcew_fred_gdp.parquet"
 UNRATE_CACHE = CACHE_DIR / "qcew_fred_unrate.parquet"
 
 
+# Fetches one FRED series and returns its observations as a (date, value)
+# DataFrame. Returns an empty DataFrame if the series has no observations.
 def _fred_observations(series_id: str, api_key: str) -> pd.DataFrame:
-    """Fetch one FRED series's observations as a (date, value) DataFrame."""
+    """Call FRED's series/observations endpoint and tidy the response.
+
+    Sends series_id and api_key with a 15-second timeout and raises
+    requests.HTTPError on a failed request (including a 429). Keeps only the
+    date and value columns, converts dates to datetimes and values to numbers
+    (FRED's "." placeholder becomes NaN and is dropped), then sorts oldest to
+    newest and resets the index.
+    """
     url = f"{FRED_API_BASE}/series/observations"
     resp = requests.get(
         url,
@@ -55,7 +70,8 @@ def _fred_observations(series_id: str, api_key: str) -> pd.DataFrame:
     return df.dropna(subset=["value"]).sort_values("date").reset_index(drop=True)
 
 
-# FRED enforces a burst rate limit (nominally 120 req/min, but it 429s much
+# Sets the request pacing and retry limits used when fetching from FRED.
+# FRED enforces a burst rate limit (nominally 120 req/min, but it 429s on much
 # tighter rapid bursts). We fetch only a handful of series, so a small fixed
 # gap between requests plus exponential backoff on a 429 keeps us under it.
 _INTER_REQUEST_GAP = 1.0   # seconds between consecutive series requests
@@ -63,12 +79,17 @@ _MAX_ATTEMPTS = 6          # per-series tries before giving up
 _BACKOFF_BASE = 1.0        # seconds; doubles each retry
 
 
+# Fetches one series, retrying on any failure. Empty responses are retried too:
+# our series are always populated, so an empty result is treated as a
+# transient glitch, not "no data".
 def _fetch_one(series_id: str, api_key: str) -> pd.DataFrame:
-    """Fetch one series with retry + backoff, honoring 429 Retry-After.
+    """Retry _fred_observations up to _MAX_ATTEMPTS times with exponential backoff.
 
-    Returns an empty DataFrame if every attempt fails. A 429 (rate limit) is
-    retried with exponential backoff; other HTTP/network errors get a short
-    backoff too, since they're usually transient.
+    The wait starts at _BACKOFF_BASE and doubles after each failed attempt,
+    with no sleep after the last one. A 429 response waits for the server's
+    Retry-After header instead, but only when it is a whole number; otherwise
+    it uses the normal delay. All other HTTP and network errors use the normal
+    delay too. Returns an empty DataFrame if every attempt fails.
     """
     delay = _BACKOFF_BASE
     for attempt in range(_MAX_ATTEMPTS):
@@ -97,18 +118,17 @@ def _fetch_one(series_id: str, api_key: str) -> pd.DataFrame:
     return pd.DataFrame()
 
 
+# Fetches every series in series_map and combines them into one long-format
+# DataFrame with columns (county_name, date, value, series_id).
+# Skips any county whose series fails, and returns an empty DataFrame only
+# if every county fails.
 def _fetch_series_set(series_map: dict[str, str], api_key: str) -> pd.DataFrame:
-    """Fetch all county series in long-format (county_name, date, value).
+    """Loop over series_map one series at a time, calling _fetch_one for each.
 
-    Each series is retried with backoff (see _fetch_one), and consecutive
-    requests are spaced out to stay under FRED's burst rate limit.
-
-    Per-county tolerant: a county whose series is missing or fails is simply
-    skipped, and the rest are still returned. This matters for the Upper
-    Peninsula, where a small county may lack a published real-GDP or LAUS
-    series on FRED — one missing series shouldn't blank out the metric for the
-    other fourteen. Returns an empty DataFrame only if EVERY county fails (so
-    we never persist an all-empty cache).
+    Sleeps _INTER_REQUEST_GAP between consecutive requests (not before the
+    first) to stay under FRED's burst rate limit. Each non-empty result is
+    tagged with its county_name and series_id, then all results are
+    concatenated. Empty results are skipped.
     """
     frames = []
     for i, (county, sid) in enumerate(series_map.items()):
@@ -116,38 +136,46 @@ def _fetch_series_set(series_map: dict[str, str], api_key: str) -> pd.DataFrame:
             time.sleep(_INTER_REQUEST_GAP)
         df = _fetch_one(sid, api_key)
         if df.empty:
-            continue  # skip just this county; keep the rest
+            # Tolerate per-county gaps: a small Upper Peninsula county may lack
+            # a published real-GDP or LAUS series on FRED, and one missing
+            # series shouldn't blank out the metric for the other fourteen.
+            continue
         df["county_name"] = county
         df["series_id"] = sid
         frames.append(df)
+    # Return empty only if every county failed, so we never cache an all-empty result.
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
+# Returns the FRED API key from the environment, or "" if it isn't set.
 def _fred_api_key() -> str:
+    """Read FRED_API_KEY from os.environ and strip surrounding whitespace."""
     return os.environ.get("FRED_API_KEY", "").strip()
 
 
+# Reports whether a FRED API key is available. Public, for use by other modules.
 def fred_key_configured() -> bool:
-    """True if a non-empty FRED_API_KEY is set — public predicate for callers."""
+    """Return True if _fred_api_key() gives a non-empty string."""
     return bool(_fred_api_key())
 
 
+# Fetches fresh data from FRED and falls back to the last-good cache if that
+# fails. This decouples the FRED KPI row from the QCEW build: a FRED hiccup
+# leaves last week's KPIs in place instead of blanking them or aborting the
+# whole publish.
 def _fetch_with_cache_fallback(
     series_map: dict[str, str], cache_path: Path
 ) -> pd.DataFrame:
-    """Fetch fresh from FRED, falling back to the last-good cache on failure.
+    """Try a fresh fetch, then the cache, then give up with an empty DataFrame.
 
-    The cache is a *fallback*, not a short-circuit: with a key set we always
-    try a fresh fetch first, so the dashboard keeps tracking FRED. Only if that
-    fetch comes back empty (a sustained rate-limit or FRED outage — see
-    _fetch_series_set, which already tolerates individual-county failures) do we
-    fall back to the committed last-good cache. This decouples the FRED KPI row
-    from the QCEW build: a FRED hiccup leaves last week's KPIs in place instead
-    of blanking them or aborting the whole publish. Fresh fetches overwrite the
-    cache, so the fallback stays current between outages.
+    With a key set, calls _fetch_series_set. If that returns rows, it creates
+    the cache folder if needed, overwrites the parquet file at cache_path, and
+    returns the fresh data. If it comes back empty (a sustained rate limit or
+    a FRED outage), it reads cache_path instead when the file exists.
 
-    Without a key (local/no-key runs) we serve the cache if present, else empty
-    (the secondary KPI row then degrades to "—").
+    Without a key (local or no-key runs) it skips the fetch and serves the
+    cache if present. Returns an empty DataFrame if there is no fresh data and
+    no cache.
     """
     api_key = _fred_api_key()
     if api_key:
@@ -162,21 +190,26 @@ def _fetch_with_cache_fallback(
     return pd.DataFrame()
 
 
+# Returns annual real GDP for the UP counties, fresh from FRED with the cache
+# as a fallback. Empty only when both the fetch and the cache are unavailable.
 @lru_cache(maxsize=1)
 def fetch_real_gdp() -> pd.DataFrame:
-    """Annual real GDP for the UP counties — fresh from FRED, cache as fallback.
+    """Call _fetch_with_cache_fallback with the GDP series and GDP_CACHE.
 
-    Memoized per process so build.py's several call sites fetch once. Returns an
-    empty DataFrame only when both the fetch and the fallback cache are absent.
+    Memoized with lru_cache, so build.py's several call sites trigger only one
+    fetch per process.
     """
     return _fetch_with_cache_fallback(FRED_GDP_SERIES, GDP_CACHE)
 
 
+# Returns the monthly unemployment rate (not seasonally adjusted) for the UP
+# counties, fresh from FRED with the cache as a fallback. Empty only when both
+# the fetch and the cache are unavailable.
 @lru_cache(maxsize=1)
 def fetch_unemployment_rate() -> pd.DataFrame:
-    """Monthly unemployment rate (NSA) for the UP counties — fresh, cache fallback.
+    """Call _fetch_with_cache_fallback with the unemployment series and UNRATE_CACHE.
 
-    Memoized per process so build.py's several call sites fetch once. Returns an
-    empty DataFrame only when both the fetch and the fallback cache are absent.
+    Memoized with lru_cache, so build.py's several call sites trigger only one
+    fetch per process.
     """
     return _fetch_with_cache_fallback(FRED_UNRATE_SERIES, UNRATE_CACHE)
