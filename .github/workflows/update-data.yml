@@ -27,6 +27,7 @@ jobs:
       - name: Build static dashboard
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
         run: python build.py
 
       # WCAG 2.1 AA gate. Runs AFTER the build and BEFORE the commit, so a

@@ -29,6 +29,7 @@ data/
   fetch.py                      # QCEW data fetch (BLS CSV API) — county + national caches in data/cache/
   fetch_fred.py                 # FRED API client — county real GDP + unemployment rate (powers KPI secondary row); rate-limit backoff (honors Retry-After)
   fetch_irs_migration.py        # IRS SOI migration fetcher — net domestic migration per county (KPI secondary row)
+  mit_ai_safety_sector_rating.csv # MIT AI Risk Navigator sector vulnerability ratings used by the county histogram
   cache/                        # Parquet caches + us_counties.geojson (map geometry)
 components/
   county_map.py                 # Interactive UP choropleth — counties shaded by YoY employment growth (NMU diverging scale)
@@ -37,6 +38,7 @@ components/
   growth_quadrant.py            # Industry Landscape — YoY employment × YoY wage growth; bubbles colored by industry domain; 4 tinted quadrants
   firm_formation.py             # Firm Openings & Closings — quarterly establishment churn aggregated from industry-level QoQ deltas
   employment_treemap.py         # Workforce Composition — treemap of private employment by NAICS sector, colored by industry domain
+  county_AI_risk_score.py       # AI vulnerability histogram weighted by county sector employment
 utils/
   formatting.py                 # fmt_number, fmt_currency, fmt_pct
   narratives.py                 # source_citation(), narrate_employment_trends(), format_industry_list()
@@ -64,14 +66,16 @@ audits/                         # Dated point-in-time data validation reports
 - Secondary row degrades to "—" if `FRED_API_KEY` is missing or a fetch fails; the primary row is unaffected. FRED fetches retry with exponential backoff on HTTP 429, and the static CI build aborts rather than publishing blanks when a key is set but the fetch fails (last good values are preserved).
 
 ### Per-County Deep Dive
-The selected county renders 4 sections:
+The selected county renders 6 sections:
 
 | # | Section | Component | Chart Type |
 |---|---------|-----------|------------|
 | 1 | Employment & Salary Trends | `employment_trends.py` | Side-by-side line charts (raw + STL trend + 2Q linear projection) |
-| 2 | Workforce Composition | `employment_treemap.py` | Treemap — sectors sized by private employment, colored by industry domain; hover shows employment, establishments, average salary, share. Year buttons switch the snapshot back to 2019. |
-| 3 | Industry Landscape | `growth_quadrant.py` | Bubble scatter — YoY employment × YoY wage growth |
-| 4 | Firm Openings & Closings | `firm_formation.py` | Stacked-relative bar — QoQ establishment additions vs. losses per quarter, with net line + dashed U.S. benchmark overlay |
+| 2 | Housing Median Value Trends | `housing_median_value_tseries.py` | Annual Census ACS median home value line chart with an accessible data table |
+| 3 | Workforce Composition | `employment_treemap.py` | Treemap — sectors sized by private employment, colored by industry domain; hover shows employment, establishments, average salary, share. Year buttons switch the snapshot back to 2019. |
+| 4 | AI Vulnerability by Sector | `county_AI_risk_score.py` | Worker-weighted histogram of MIT sector vulnerability ratings, with an employment-weighted average and accessible data table |
+| 5 | Industry Landscape | `growth_quadrant.py` | Bubble scatter — YoY employment × YoY wage growth |
+| 6 | Firm Openings & Closings | `firm_formation.py` | Stacked-relative bar — QoQ establishment additions vs. losses per quarter, with net line + dashed U.S. benchmark overlay |
 
 ## Counties
 

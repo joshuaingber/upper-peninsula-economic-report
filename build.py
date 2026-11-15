@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
+# Static site builder: turns the cleaned QCEW, FRED, and IRS data into the
+# published dashboard pages (main dashboard, landing page, and iframe embeds)
+# under docs/.
 """
 Build static HTML dashboard from QCEW data for GitHub Pages.
 
-Reuses the existing data pipeline (data/fetch.py, data/clean.py) and
-recreates all Plotly charts from the Streamlit app as a self-contained
-docs/index.html with embedded JSON figure data rendered by Plotly.js.
+Loads and cleans the QCEW data (data/fetch.py, data/clean.py), builds each
+Plotly chart as a JSON figure, and embeds that JSON in self-contained HTML
+pages, where Plotly.js draws the charts in the browser. The output is
+docs/index.html (full dashboard), docs/custom-page.html (landing page), and
+docs/embeds/ (standalone pages for iframes).
 
 Usage:
     python build.py
@@ -21,24 +26,54 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from data.fetch import fetch_all_data
+from data.aggregate_dataframe import get_aggregate_data
 from data.clean import (
     clean, get_total_covered, get_latest_quarter, get_growth_quadrant_data,
+    latest_gdp_with_growth, latest_unrate_with_yoy, latest_irs_net,
 )
-from data.analysis import deseasonalize_trend, project_trend, periods_to_current_quarter
+from data.analysis import (
+    deseasonalize_trend, project_trend, periods_to_current_quarter,
+    merge_mit_ai_safety_sector_rating_with_qcew,
+)
 from components.growth_quadrant import (
     build_figure as build_growth_quadrant_fig,
     METHODOLOGY_NOTE as _GROWTH_QUADRANT_TEXT,
 )
+
+from functools import lru_cache
+
+from components.housing_median_value_tseries import METHODOLOGY_NOTE as _HOUSING_TEXT
+HOUSING_NOTE = f'<p class="source"><em>{_HOUSING_TEXT}</em></p>'
+# Wraps the growth quadrant's methodology text in a small source-note paragraph.
 GROWTH_QUADRANT_NOTE = f'<p class="source"><em>{_GROWTH_QUADRANT_TEXT}</em></p>'
 from data.constants import (
     FAU_BLUE, FAU_RED, FAU_DARK_GRAY, FAU_GRAY,
     FAU_ELECTRIC_BLUE, FAU_SKY_BLUE, COUNTY_COLORS, COUNTIES,
     NMU_FONT_FAMILY, GOOGLE_FONTS_IMPORT, PLOTLY_FONT,
     NMU_LINK, NMU_MUTED, NMU_BORDER,
+    SECTOR_RATING_CSV_PATH,
 )
 from utils.formatting import fmt_number, fmt_currency, fmt_pct
-from utils.narratives import narrate_employment_trends, format_industry_list
+from utils.narratives import (
+    narrate_employment_trends, format_industry_list,
+    narrate_median_house_value_trends,
+)
 
+
+def _load_ai_risk_data(qcew_df):
+    from data.clean import (
+        clean_mit_ai_safety_sector_rating,
+        clean_qcew_data_for_AI_risk_embed,
+    )
+
+    ratings = clean_mit_ai_safety_sector_rating(
+        pd.read_csv(SECTOR_RATING_CSV_PATH)
+    )
+    workers = clean_qcew_data_for_AI_risk_embed(qcew_df)
+    return merge_mit_ai_safety_sector_rating_with_qcew(ratings, workers)
+
+# Sets the output folder (docs/, which GitHub Pages serves) and a minimum
+# employment threshold.
 DOCS_DIR = Path(__file__).parent / "docs"
 MIN_EMPLOYMENT = 100
 
@@ -52,13 +87,20 @@ DETAIL_COUNTY_N = len(COUNTIES)
 
 
 def _detail_counties(df) -> list[str]:
-    """Names of the N largest UP county economies for per-county detail/embeds."""
+    """Ask components.top_counties.get_top_counties for the top DETAIL_COUNTY_N counties.
+
+    Returns their county_name values as a list. If that comes back empty, it
+    falls back to the first DETAIL_COUNTY_N names in COUNTIES.
+    """
     from components.top_counties import get_top_counties
     top = get_top_counties(df, DETAIL_COUNTY_N)
     if not top.empty:
         return top["county_name"].tolist()
     return list(COUNTIES.values())[:DETAIL_COUNTY_N]
 
+def _detail_locations(df):
+    """Return Aggregate plus the individual counties."""
+    return ["Upper Peninsula", *_detail_counties(df)]
 # ── CSS ──────────────────────────────────────────────────────────────────────
 
 # Shared WCAG 2.1 AA layer, appended to BOTH the main and embed stylesheets.
@@ -129,6 +171,8 @@ table.data-table th[scope="row"] { text-align: left; }
 }
 """
 
+# Stylesheet for the main dashboard page (index.html), with the accessibility
+# layer appended last. The landing page also starts from this and adds its own.
 CSS = GOOGLE_FONTS_IMPORT + """
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -282,6 +326,8 @@ function selectTreemapYear(btn) {
 }
 """
 
+# Script for the main dashboard: county tab switching (with a chart resize so
+# hidden charts redraw correctly) and drawing every chart in figureData.
 JS = TREEMAP_JS + """
 function renderChart(divId) {
     var el = document.getElementById(divId);
@@ -438,13 +484,18 @@ Object.keys(figureData).forEach(function(divId) {
 """
 
 
+# Wraps an HTML fragment into a complete, standalone page that can be shown in
+# an iframe on another site.
 def wrap_as_embed(body_html: str, figures: dict, page_title: str) -> str:
-    """Wrap a body HTML fragment into a self-contained embed page.
+    """Build a full HTML document around body_html using EMBED_CSS and EMBED_JS.
 
     Each embed is a standalone HTML document: loads Plotly from CDN, bundles
     the trimmed embed CSS, renders the included figures, and posts its content
-    height to the parent via postMessage. CSS isolation is automatic — iframes
-    have their own document, so styles cannot collide with the host page.
+    height to the parent via postMessage. It also adds a visually hidden h1
+    containing page_title (HTML-escaped) so the page has a valid heading
+    outline, and serializes `figures` to JSON as the `figureData` variable
+    that EMBED_JS reads. CSS isolation is automatic — iframes have their own
+    document, so styles cannot collide with the host page.
     """
     figures_json = json.dumps(figures)
     return "\n".join([
@@ -478,7 +529,10 @@ def wrap_as_embed(body_html: str, figures: dict, page_title: str) -> str:
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+# Standard source line shown under every chart section.
 SOURCE = '<p class="source">Source: <a href="https://www.bls.gov/cew/">BLS QCEW</a> — Quarterly</p>'
+# Methodology note shown under the trends section, explaining the STL trend and
+# the projection.
 TRENDS_NOTE = (
     '<p class="source"><em>Chart shows the STL trend (raw quarterly values omitted '
     'for clarity). Trend computed via STL decomposition (period=4, robust); salary '
@@ -489,8 +543,9 @@ TRENDS_NOTE = (
 )
 
 
+# Converts a Plotly figure into a JSON-serializable dict.
 def _fig_json(fig):
-    """Convert a Plotly figure to a JSON-serializable dict."""
+    """Serialize the figure with fig.to_json() and parse it back with json.loads."""
     return json.loads(fig.to_json())
 
 
@@ -499,12 +554,13 @@ def _fig_json(fig):
 # aria-label and (b) a collapsible, machine-readable data table built from the
 # same DataFrame that feeds the chart — the WCAG 1.1.1 text alternative.
 
+# Returns the empty <div> where Plotly will draw a chart, labeled for screen readers.
 def _chart_div(div_id, aria_label):
     """Plotly mount point exposed to assistive tech as one labeled image.
 
     role="img" makes screen readers announce `aria_label` and skip the SVG
     internals Plotly injects at runtime; the adjacent data table carries the
-    full numbers.
+    full numbers. The label is HTML-escaped.
     """
     return (
         f'<div id="{div_id}" class="plotly-chart" role="img" '
@@ -512,17 +568,20 @@ def _chart_div(div_id, aria_label):
     )
 
 
+# Formats a percentage for a table cell, using a dash when the value is missing.
 def _pct_str(v):
-    """Signed percent for a table cell; em dash when missing."""
+    """Return "—" if v is NaN, otherwise v with a sign and one decimal, like "+2.3%"."""
     return "—" if pd.isna(v) else f"{v:+.1f}%"
 
 
+# Builds a collapsible HTML data table that serves as the text alternative to a chart.
 def _data_table_html(caption, columns, rows):
     """Build a WCAG-compliant, collapsible data table.
 
     columns: header labels; the first names the row-header column.
     rows: iterable of tuples; each row's first cell becomes a <th scope="row">.
-    Cell values are pre-formatted strings.
+    Cell values are pre-formatted strings. All text is HTML-escaped, and the
+    table is wrapped in a <details> element with a scrollable container.
     """
     head = "".join(f'<th scope="col">{_html.escape(str(c))}</th>' for c in columns)
     body = []
@@ -592,8 +651,9 @@ def _map_table_html(summary, benchmarks=None):
     )
 
 
+# Builds the data table that accompanies the largest-county growth comparison.
 def _top_table_html(top):
-    """Data table for the largest-county growth comparison."""
+    """Format one row per county with its YoY employment, establishment, and wage growth."""
     rows = [
         (
             f'{r["county_name"]} County',
@@ -611,11 +671,15 @@ def _top_table_html(top):
     )
 
 
+# Returns the small year-over-year change badge (arrow and percent) shown on KPI
+# cards, or an empty string if the value is missing.
 def _delta_html(pct):
     """Render a YoY percent-change badge.
 
     Direction is conveyed three ways (WCAG 1.4.1 — never color alone): the
-    ▲/▼ glyph, the value, and an aria-label word for screen readers.
+    ▲/▼ glyph, the value, and an aria-label word for screen readers. Zero or
+    positive values use the "positive" style and an up arrow; negative values
+    use the "negative" style and a down arrow.
     """
     if pd.isna(pct):
         return ""
@@ -628,13 +692,24 @@ def _delta_html(pct):
 
 # ── KPI Card ─────────────────────────────────────────────────────────────────
 
-def _secondary_row_html(secondary):
-    """Build the second KPI row HTML — Real GDP, Unemployment, Net Migration."""
+# Builds the second row of a KPI card: real GDP, unemployment rate, and net
+# migration. Any missing value shows "—" and "(unavailable)".
+def _secondary_row_html(secondary, county_name=None):
+    """Build the second KPI row HTML — Real GDP, Unemployment, Net Migration.
+
+    `secondary` is a dict with optional "gdp", "unrate", and "irs" entries (the
+    outputs of the latest_* helpers in data/clean.py). GDP shows billions and a
+    YoY badge. Unemployment shows the rate and a percentage-point badge, with
+    the color inverted (rising is red, falling is green) because lower is
+    better. Migration shows a signed net count with its filing-year window and
+    no arrow.
+    """
     secondary = secondary or {}
     gdp = secondary.get("gdp") or {}
     unr = secondary.get("unrate") or {}
     irs = secondary.get("irs") or {}
-
+    unr_label = ("Simple Average Unemployment Rate"
+                 if county_name == "Upper Peninsula" else "Unemployment rate")
     if gdp:
         gdp_value = f"${gdp['value_billions']:.1f}B"
         growth = gdp["yoy_growth"]
@@ -677,7 +752,7 @@ def _secondary_row_html(secondary):
         f'<div class="kpi-row secondary">'
         f'<div class="kpi-item"><div class="kpi-label">Real GDP</div>'
         f'<div class="kpi-value">{gdp_value}</div>{gdp_delta}{gdp_period}</div>'
-        f'<div class="kpi-item"><div class="kpi-label">Unemployment rate</div>'
+        f'<div class="kpi-item"><div class="kpi-label">{unr_label}</div>'
         f'<div class="kpi-value">{unr_value}</div>{unr_delta}{unr_period}</div>'
         f'<div class="kpi-item"><div class="kpi-label">Net Migration</div>'
         f'<div class="kpi-value">{irs_value}</div>{irs_delta}{irs_period}</div>'
@@ -685,23 +760,100 @@ def _secondary_row_html(secondary):
     )
 
 
-def build_kpi_card(county_df, county_name, color, secondary=None):
-    """Generate HTML for one county KPI card (primary + optional secondary row)."""
+UP = "Upper Peninsula"
+
+
+def _secondary_for(county_name, df_gdp, df_unrate, df_irs):
+    """Second-row data for a county, or the 15-county aggregate for UP."""
+    if county_name != UP:
+        return {
+            "gdp": latest_gdp_with_growth(df_gdp, county_name),
+            "unrate": latest_unrate_with_yoy(df_unrate, county_name),
+            "irs": latest_irs_net(df_irs, county_name),
+        }
+
+    gdp, unrate, irs = {}, {}, {}
+
+    if not df_gdp.empty:
+        n = df_gdp["county_name"].nunique()
+        counts = df_gdp.groupby("date")["county_name"].nunique()
+        full = counts[counts == n].index
+        g = df_gdp[df_gdp["date"].isin(full)]
+        g = g.groupby("date", as_index=False)["value"].sum()
+        g["county_name"] = UP
+        gdp = latest_gdp_with_growth(g, UP)
+
+    if not df_unrate.empty:
+        u = df_unrate.groupby("date", as_index=False)["value"].mean()
+        u["county_name"] = UP
+        unrate = latest_unrate_with_yoy(u, UP)
+
+    if not df_irs.empty:
+        year = df_irs["tax_year"].max()
+        total = df_irs[df_irs["tax_year"] == year]["net_exemptions"].sum()
+        irs = latest_irs_net(
+            pd.DataFrame([{"county_name": UP, "tax_year": year, "net_exemptions": total}]),
+            UP,
+        )
+
+    return {"gdp": gdp, "unrate": unrate, "irs": irs}
+
+
+def _display_name(county_name):
+    return "Upper Peninsula" if county_name == "Upper Peninsula" else f"{county_name} County"
+
+def _latest_housing(county_housing_df):
+    """(formatted latest median home value, YoY % or None) — same logic as app.py."""
+    if county_housing_df is None or county_housing_df.empty:
+        return "—", None
+    rows = county_housing_df.sort_values("year")
+    latest = rows.iloc[-1]
+    val = latest["median_home_value"]
+    if pd.isna(val):
+        return "—", None
+    prior = rows[rows["year"] == latest["year"] - 1]
+    pct = None
+    if not prior.empty:
+        pv = prior.iloc[-1]["median_home_value"]
+        if pd.notna(pv) and pv != 0:
+            pct = (val - pv) / pv * 100
+    return fmt_currency(val), pct
+
+# Builds the HTML for one county's KPI card: employment, establishments, and
+# average salary, plus the optional second row.
+def build_kpi_card(county_df, county_name, color, secondary=None, housing_df=None):
+    """Generate HTML for one county KPI card (primary + optional secondary row).
+
+    Takes the county's latest-quarter total-covered row and shows its
+    employment, establishment count, and average annual wage, each with a YoY
+    badge from the BLS over-the-year columns. The secondary row comes from
+    _secondary_row_html. If the county has no total-covered data, it returns a
+    card that says "No data available." The county color is used for the left
+    border and the name.
+    """
+    display = _display_name(county_name)                                              # EDIT 2: new line
     totals = get_total_covered(county_df)
     latest = get_latest_quarter(totals)
 
     if latest.empty:
         return (
             f'<div class="county-card" style="border-left-color: {color};">'
-            f'<h3 style="color: {color};">{county_name} County</h3>'
+            f'<h3 style="color: {color};">{display}</h3>'                             # EDIT 2: was {county_name} County
             f'<p>No data available.</p></div>'
         )
 
     row = latest.iloc[0]
-    secondary_html = _secondary_row_html(secondary)
+    secondary_html = _secondary_row_html(secondary, county_name)                      # EDIT 3: pass county_name
+
+    county_housing = (                                                                # EDIT 4: all new (3 blocks)
+        housing_df[housing_df["county_name"] == county_name]
+        if housing_df is not None and not housing_df.empty else None
+    )
+    housing_value, housing_pct = _latest_housing(county_housing)
+
     return (
         f'<div class="county-card" style="border-left-color: {color};">'
-        f'<h3 style="color: {color};">{county_name} County</h3>'
+        f'<h3 style="color: {color};">{display}</h3>'                                 # EDIT 2 again
         f'<div class="kpi-row">'
         f'<div class="kpi-item"><div class="kpi-label">Employment</div>'
         f'<div class="kpi-value">{fmt_number(row["employment"])}</div>'
@@ -712,6 +864,9 @@ def build_kpi_card(county_df, county_name, color, secondary=None):
         f'<div class="kpi-item"><div class="kpi-label">Average Salary</div>'
         f'<div class="kpi-value">{fmt_currency(row["avg_annual_wage"])}</div>'
         f'{_delta_html(row.get("oty_avg_wkly_wage_pct_chg"))}</div>'
+        f'<div class="kpi-item"><div class="kpi-label">Median Home Value</div>'       # EDIT 4: new 4th item
+        f'<div class="kpi-value">{housing_value}</div>'
+        f'{_delta_html(housing_pct)}</div>'
         f'</div>{secondary_html}</div>'
     )
 
@@ -720,8 +875,20 @@ def build_kpi_card(county_df, county_name, color, secondary=None):
 # Each function builds Plotly figures, adds them to `figures` dict,
 # and returns the HTML for that dashboard section.
 
+# Builds one trend line chart (the STL trend plus a dotted projection) for a
+# county's employment or salary series.
 def _trends_chart(totals, y_col, title, color, tickformat, hover_prefix, log_transform):
-    """Side-by-side STL-trend chart with linear projection through the current quarter."""
+    """Side-by-side STL-trend chart with linear projection through the current quarter.
+
+    Computes the STL trend of y_col (from quarters that are not suppressed and
+    have an establishment count), aligned to all of the county's quarters.
+    The projection horizon is periods_to_current_quarter of the last trend
+    date, and project_trend extends the trend using a fit on its last 4
+    points. The solid "Trend" line and the dotted "Projected" line (with open
+    markers) share the county color, and the projected span is shaded and
+    labeled "PROJECTED". Hover text shows the year-quarter label, with
+    projected points labeled "(projected)". Use log_transform=True for wages.
+    """
     indexed = totals.set_index("date").sort_index()
     labels = indexed["year_qtr"]
 
@@ -797,6 +964,8 @@ def _trends_chart(totals, y_col, title, color, tickformat, hover_prefix, log_tra
     return fig
 
 
+# Builds the Employment & Salary Trends section for one county: a narrative,
+# two side-by-side trend charts, and a data table. Returns (html, figures).
 def build_trends(county_df, county_name, county_id, heading_level=2):
     """Employment & Salary Trends — raw + STL-trend overlays, side by side.
 
@@ -805,6 +974,12 @@ def build_trends(county_df, county_name, county_id, heading_level=2):
     the fragment as a standalone embed page. ``heading_level`` controls the
     section heading tag: 2 for standalone embeds (under their sr-only h1), 4
     for the index detail tabs (under the h3 county name below "County Detail").
+
+    The narrative comes from narrate_employment_trends, extended with the
+    change in average annual wage between the first and last quarters. The
+    charts come from _trends_chart (employment on a linear scale, salary on a
+    log scale). If the county has no total-covered data, it returns a short
+    "No trend data available." section and an empty figures dict.
     """
     h, _h = f"h{heading_level}", f"/h{heading_level}"
     totals = get_total_covered(county_df)
@@ -861,8 +1036,19 @@ def build_trends(county_df, county_name, county_id, heading_level=2):
     return html, figures
 
 
+# Builds the Industry Landscape section for one county: a narrative, the growth
+# quadrant bubble chart, and a data table. Returns (html, figures).
 def build_growth_quadrant(county_df, county_name, county_id, heading_level=2):
-    """Growth Quadrant — YoY employment vs salary growth, domain-colored bubbles."""
+    """Growth Quadrant — YoY employment vs salary growth, domain-colored bubbles.
+
+    Gets the chart data from get_growth_quadrant_data. The narrative names up
+    to 3 of the largest industries growing on both measures (both rates above
+    zero) and up to 2 of the largest shrinking on both (both below zero);
+    industries at exactly zero are in neither list. The figure comes from
+    components.growth_quadrant, and the data table is sorted by employment. If
+    there is no disclosable data, it returns a short message section and an
+    empty figures dict.
+    """
     h, _h = f"h{heading_level}", f"/h{heading_level}"
     plot_data = get_growth_quadrant_data(county_df)
     if plot_data.empty:
@@ -918,6 +1104,7 @@ def build_growth_quadrant(county_df, county_name, county_id, heading_level=2):
     return html, figures
 
 
+# Wraps the firm-formation and treemap methodology texts in source-note paragraphs.
 from components.firm_formation import METHODOLOGY_NOTE as _FIRM_FORMATION_TEXT
 FIRM_FORMATION_NOTE = f'<p class="source"><em>{_FIRM_FORMATION_TEXT}</em></p>'
 
@@ -925,8 +1112,20 @@ from components.employment_treemap import METHODOLOGY_NOTE as _EMPLOYMENT_TREEMA
 EMPLOYMENT_TREEMAP_NOTE = f'<p class="source"><em>{_EMPLOYMENT_TREEMAP_TEXT}</em></p>'
 
 
+# Builds the Firm Openings & Closings section for one county: a narrative, the
+# quarterly establishment-change chart, and a data table. Returns (html, figures).
 def build_firm_formation(county_df, county_name, county_id, heading_level=2):
-    """Firm Openings & Closings — quarterly establishment churn (industry-level decomposition)."""
+    """Firm Openings & Closings — quarterly establishment churn (industry-level decomposition).
+
+    Gets the per-quarter additions, subtractions, and net from
+    get_firm_formation_data. It also tries to load the U.S. national
+    benchmark (get_national_qoq_pct of fetch_national_data) and the county's
+    prior-quarter establishment counts, and falls back to None for either one
+    if loading fails, so the chart degrades to a version without the
+    benchmark. The narrative describes the most recent quarter as expanded,
+    contracted, or flat. If there is not enough data, it returns a short
+    message section and an empty figures dict.
+    """
     from components.firm_formation import build_figure as firm_formation_fig
     from data.clean import get_firm_formation_data, get_national_qoq_pct
     from data.fetch import fetch_national_data
@@ -992,8 +1191,21 @@ def build_firm_formation(county_df, county_name, county_id, heading_level=2):
 
 # ── HTML Assembly ────────────────────────────────────────────────────────────
 
+# Builds the Workforce Composition section for one county: a narrative, the
+# treemap with year buttons, and a data table. Returns (html, figures).
 def build_employment_treemap(county_df, county_name, county_id, heading_level=2):
-    """Workforce Composition — multi-trace treemap with year-selector buttons."""
+    """Workforce Composition — multi-trace treemap with year-selector buttons.
+
+    Gets one snapshot per year from get_treemap_snapshots and draws them as
+    separate traces with components.employment_treemap. The narrative names
+    the three largest private-sector employers in the latest snapshot. Plotly's
+    built-in year menu is removed, and when there is more than one year,
+    keyboard-operable HTML buttons (handled by selectTreemapYear in the page
+    script) toggle which trace is visible, with the latest year selected by
+    default. The data table covers the latest snapshot. If there is no
+    disclosable data, it returns a short message section and an empty figures
+    dict.
+    """
     from components.employment_treemap import build_figure as treemap_fig
     from data.clean import get_treemap_snapshots
 
@@ -1068,26 +1280,183 @@ def build_employment_treemap(county_df, county_name, county_id, heading_level=2)
     )
     return html, figures
 
+# Source line shown under the housing section.
+HOUSING_SOURCE = (
+    '<p class="source">Source: <a href="https://www.census.gov/programs-surveys/acs">'
+    'U.S. Census Bureau ACS</a> — Annual</p>'
+)
 
+
+# Loads the Census housing data once per build so every county page reuses it.
+@lru_cache(maxsize=1)
+def _housing_df():
+    """Call get_up_housing() on first use and cache the result with lru_cache.
+
+    If the load fails it prints a warning and returns an empty DataFrame, so
+    the build still finishes and each county's housing section shows its
+    "no data" message instead of crashing the whole publish.
+    """
+    from data.fetch_Census_housing import get_up_housing
+    try:
+        return get_up_housing()
+    except Exception as e:
+        print(f"WARNING: housing data could not be loaded: {e}", file=sys.stderr)
+        return pd.DataFrame()
+
+
+# Builds the Housing Median Value section for one county: a narrative, the
+# time-series chart, and a data table. Returns (html, figures).
+def build_housing_trends(county_df, county_name, county_id, heading_level=2):
+    """Housing Median Value Trends: Census ACS median home value by year.
+
+    Takes the same arguments as the QCEW builders so it fits SECTION_BUILDERS,
+    but ignores county_df and filters the cached housing DataFrame to
+    county_name instead. The narrative comes from
+    narrate_median_house_value_trends, the same function the Streamlit app
+    uses, called with the first and last years that have a median value. The
+    figure comes from components.housing_median_value_tseries.build_figure.
+    If the county has no housing rows, it returns a short message section and
+    an empty figures dict.
+    """
+    from components.housing_median_value_tseries import build_figure as build_housing_median_value_fig
+
+    h, _h = f"h{heading_level}", f"/h{heading_level}"
+    title = "Housing Median Value Trends"
+    empty = f'<div class="section"><{h}>{title}<{_h}><p>No housing data available.</p></div>', {}
+
+    housing = _housing_df()
+    if housing.empty or "county_name" not in housing.columns:
+        return empty
+
+    rows = housing[housing["county_name"] == county_name].sort_values("year")
+    rows = rows[rows["median_home_value"].notna()]
+    if rows.empty:
+        return empty
+
+    first, last = rows.iloc[0], rows.iloc[-1]
+    y0, y1 = int(first["year"]), int(last["year"])
+    narrative = narrate_median_house_value_trends(
+        county_name=county_name,
+        start_year=y0, end_year=y1,
+        start_value=first["median_home_value"],
+        end_value=last["median_home_value"],
+    )
+
+    fig = build_housing_median_value_fig(rows)
+    div_id = f"{county_id}-housing-median-value"
+    figures = {div_id: _fig_json(fig)}
+
+    aria = f"Line chart of median home value in {county_name} County, {y0} to {y1}."
+    table = _data_table_html(
+        f"{county_name} County — median home value by year",
+        ["Year", "Median Home Value"],
+        [(int(r["year"]), fmt_currency(r["median_home_value"])) for _, r in rows.iterrows()],
+    )
+
+    html = (
+        f'<div class="section"><{h}>{title}<{_h}>'
+        f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
+        f"{_chart_div(div_id, aria)}</figure>{table}{HOUSING_SOURCE}{HOUSING_NOTE}</div>"
+    )
+    return html, figures
+
+
+def build_ai_risk_score(mit_ai_risk_merged_df, county_name, county_id, heading_level=2):
+    from components.county_AI_risk_score import (
+        build_figure as ai_risk_figure,
+        get_county_risk_data,
+    )
+
+    h, _h = f"h{heading_level}", f"/h{heading_level}"
+    county_data = get_county_risk_data(mit_ai_risk_merged_df, county_name)
+    title = "AI Vulnerability by Sector"
+    if county_data.empty:
+        return (
+            f'<div class="section"><{h}>{title}<{_h}>'
+            f'<p>No AI vulnerability rating data is available for '
+            f'{county_name} County.</p></div>',
+            {},
+        )
+
+    total_workers = county_data["number_of_workers"].sum()
+    weighted_average = county_data["weighted_score"].sum() / total_workers
+    narrative = (
+        f"Across {len(county_data)} rated sectors, the employment-weighted "
+        f"average AI vulnerability score is {weighted_average:.2f} out of 5, "
+        f"representing {fmt_number(total_workers)} workers."
+    )
+
+    div_id = f"{county_id}-ai-risk-score"
+    fig = ai_risk_figure(county_data, county_name, weighted_average)
+    figures = {div_id: _fig_json(fig)}
+    aria = (
+        f"Histogram of workers by AI vulnerability score for {county_name} "
+        f"County across {len(county_data)} rated sectors. A dashed vertical "
+        f"line marks the employment-weighted average score of "
+        f"{weighted_average:.2f} out of 5."
+    )
+    table = _data_table_html(
+        f"{county_name} County — sector AI vulnerability scores and workers",
+        ["Sector", "Vulnerability Score", "Workers", "Weighted Score Contribution"],
+        [
+            (
+                row["target_code"],
+                f'{row["risk_score"]:.2f}',
+                fmt_number(row["number_of_workers"]),
+                fmt_number(row["weighted_score"]),
+            )
+            for _, row in county_data.sort_values("target_code").iterrows()
+        ],
+    )
+    source = (
+        '<p class="source">Sector vulnerability ratings: '
+        '<a href="https://airisk.mit.edu/navigator#/taxonomies">MIT AI Risk '
+        'Navigator</a>. Employment: latest published BLS QCEW quarter.</p>'
+    )
+    html = (
+        f'<div class="section"><{h}>{title}<{_h}>'
+        f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
+        f'{_chart_div(div_id, aria)}</figure>{table}{source}</div>'
+    )
+    return html, figures
+
+
+# Lists the five per-county sections in display order. Both the detail tabs in
+# index.html and the standalone embeds loop over this list.
 # (slug, builder) pairs — the slug is used as the embed filename under
 # docs/embeds/<county>/<slug>.html.
 SECTION_BUILDERS = [
     ("trends", build_trends),
+    ("housing-median-value", build_housing_trends),
     ("workforce-composition", build_employment_treemap),
     ("industry-landscape", build_growth_quadrant),
     ("firm-formation", build_firm_formation),
 ]
 
 
-def build_html(df):
+def _section_builders(mit_ai_risk_merged_df):
+    def build_county_ai_risk(_county_df, county_name, county_id, heading_level=2):
+        return build_ai_risk_score(
+            mit_ai_risk_merged_df, county_name, county_id, heading_level
+        )
+
+    builders = SECTION_BUILDERS.copy()
+    builders.insert(3, ("ai-risk-score", build_county_ai_risk))
+    return builders
+
+
+def build_html(df, housing_df, mit_ai_risk_merged_df=None):
     """Assemble the complete static HTML dashboard."""
     from data.fetch_fred import fetch_real_gdp, fetch_unemployment_rate
     from data.fetch_irs_migration import fetch_irs_migration
     from data.clean import (
         latest_gdp_with_growth, latest_unrate_with_yoy, latest_irs_net,
     )
-
+    aggregate_df = get_aggregate_data(df)
     figures = {}
+    if mit_ai_risk_merged_df is None:
+        mit_ai_risk_merged_df = _load_ai_risk_data(df)
+    section_builders = _section_builders(mit_ai_risk_merged_df)
 
     # Data quarter badge
     sample_totals = get_total_covered(df)
@@ -1160,31 +1529,32 @@ def build_html(df):
     # ── Per-county detail tabs (KPI card + four chart sections each), limited
     # to the largest county economies.
     tab_buttons = ""
-    tab_content = ""
-    for idx, county_name in enumerate(_detail_counties(df)):
-        county_df = df[df["county_name"] == county_name]
+    tab_content = ""   
+    for idx, county_name in enumerate(_detail_locations(df)):
+        if county_name == "Upper Peninsula":
+            county_df = aggregate_df
+        else:
+            county_df = df[df["county_name"] == county_name]
         county_id = county_name.lower().replace(" ", "-")
         active = " active" if idx == 0 else ""
         color = COUNTY_COLORS.get(county_name, FAU_BLUE)
-        secondary = {
-            "gdp": latest_gdp_with_growth(df_gdp_secondary, county_name),
-            "unrate": latest_unrate_with_yoy(df_unrate_secondary, county_name),
-            "irs": latest_irs_net(df_irs_secondary, county_name),
-        }
-
+        secondary = _secondary_for(
+            county_name, df_gdp_secondary, df_unrate_secondary, df_irs_secondary
+        )
+        display = _display_name(county_name)
         tab_buttons += (
             f'<button class="tab-btn{active}" data-tab="{county_id}" '
             f'aria-pressed="{"true" if idx == 0 else "false"}" '
             f'aria-controls="{county_id}" '
-            f"onclick=\"showTab('{county_id}')\">{county_name} County</button>\n"
+            f"onclick=\"showTab('{county_id}')\">{display}</button>\n"
         )
 
         sections = [
             f'<div class="snapshot-row single-county">'
-            f'{build_kpi_card(county_df, county_name, color, secondary)}</div>',
+            f'{build_kpi_card(county_df, county_name, color, secondary, housing_df)}</div>',
             KPI_CAPTION_HTML,
         ]
-        for _slug, builder in SECTION_BUILDERS:
+        for _slug, builder in section_builders:
             sections.append('<div class="divider"></div>')
             # Index detail sections sit under the h3 county name, itself under the
             # h2 "County Detail" — so they must be h4 to keep the hierarchy nested
@@ -1255,7 +1625,7 @@ KPI_CAPTION_HTML = (
 )
 
 
-def write_embeds(df):
+def write_embeds(df, housing_df, mit_ai_risk_merged_df=None):
     """Emit standalone embed pages: the region overview visuals plus per-county
     KPI cards and chart sections for the largest county economies.
 
@@ -1280,6 +1650,9 @@ def write_embeds(df):
 
     embeds_dir = DOCS_DIR / "embeds"
     embeds_dir.mkdir(parents=True, exist_ok=True)
+    if mit_ai_risk_merged_df is None:
+        mit_ai_risk_merged_df = _load_ai_risk_data(df)
+    section_builders = _section_builders(mit_ai_risk_merged_df)
 
     df_gdp = fetch_real_gdp()
     df_unrate = fetch_unemployment_rate()
@@ -1336,33 +1709,31 @@ def write_embeds(df):
         )
 
     # ── Per-county KPI + chart embeds for the largest county economies. ──────
-    order = _detail_counties(df)
+    aggregate_df = get_aggregate_data(df)
+    order = _detail_locations(df)
     for county_name in order:
-        county_df = df[df["county_name"] == county_name]
+        county_df = (aggregate_df if county_name == "Upper Peninsula"
+                 else df[df["county_name"] == county_name])
         county_id = county_name.lower().replace(" ", "-")
         color = COUNTY_COLORS.get(county_name, FAU_BLUE)
-        secondary = {
-            "gdp": latest_gdp_with_growth(df_gdp, county_name),
-            "unrate": latest_unrate_with_yoy(df_unrate, county_name),
-            "irs": latest_irs_net(df_irs, county_name),
-        }
-        card_html = build_kpi_card(county_df, county_name, color, secondary)
+        secondary = _secondary_for(county_name, df_gdp, df_unrate, df_irs)
+        card_html = build_kpi_card(county_df, county_name, color, secondary, housing_df)
         body = (
             f'<h2 style="color: {FAU_BLUE}; margin-bottom: 0.5rem;">'
-            f'{county_name} County Snapshot</h2>'
+            f'{_display_name(county_name)} Snapshot</h2>'
             f'<div class="snapshot-row single-county">{card_html}</div>'
             f'{KPI_CAPTION_HTML}'
         )
         (embeds_dir / f"kpi-{county_id}.html").write_text(
-            wrap_as_embed(body, {}, f"{county_name} County — KPI Snapshot"),
+            wrap_as_embed(body, {}, f"{_display_name(county_name)} — KPI Snapshot"),
             encoding="utf-8",
         )
 
         county_dir = embeds_dir / county_id
         county_dir.mkdir(parents=True, exist_ok=True)
-        for slug, builder in SECTION_BUILDERS:
+        for slug, builder in section_builders:
             section_html, section_figs = builder(county_df, county_name, county_id)
-            title = f"{county_name} County — {slug.replace('-', ' ').title()}"
+            title = f"{_display_name(county_name)} — {slug.replace('-', ' ').title()}"
             (county_dir / f"{slug}.html").write_text(
                 wrap_as_embed(section_html, section_figs, title),
                 encoding="utf-8",
@@ -1370,9 +1741,29 @@ def write_embeds(df):
 
     print(
         f"  Wrote 2 overview embeds + {len(order)} KPI embeds + "
-        f"{len(order) * len(SECTION_BUILDERS)} chart embeds to {embeds_dir}"
+        f"{len(order) * len(section_builders)} chart embeds to {embeds_dir}"
     )
 
+
+from data.fetch_Census_housing import get_up_housing
+
+def _load_housing():
+    """Census housing data; an empty DataFrame (cells show '—') on any failure."""
+    try:
+        return get_up_housing()
+    except Exception as exc:  # must never break the build
+        print(f"WARNING: housing data unavailable ({exc}); housing KPI/chart will be blank")
+        return pd.DataFrame()
+
+from data.fetch_Census_housing import get_up_housing
+
+def _load_housing():
+    """Census housing data; an empty DataFrame (cells show '—') on any failure."""
+    try:
+        return get_up_housing()
+    except Exception as exc:  # must never break the build
+        print(f"WARNING: housing data unavailable ({exc}); housing KPI/chart will be blank")
+        return pd.DataFrame()
 
 # ── Entry point ──────────────────────────────────────────────────────────────
 
@@ -1411,9 +1802,10 @@ if __name__ == "__main__":
                 "fetch returned no data and no fallback cache exists; the "
                 "secondary KPI row will show '—'. Publishing fresh QCEW data."
             )
-
+    housing_df = _load_housing()
     print("Building HTML dashboard...")
-    html = build_html(df)
+    mit_ai_risk_merged_df = _load_ai_risk_data(raw)
+    html = build_html(df, housing_df, mit_ai_risk_merged_df)
 
     DOCS_DIR.mkdir(exist_ok=True)
     output = DOCS_DIR / "index.html"
@@ -1421,4 +1813,4 @@ if __name__ == "__main__":
     print(f"Done! {output} ({output.stat().st_size / 1024:.0f} KB)")
 
     print("Building embed pages...")
-    write_embeds(df)
+    write_embeds(df,housing_df, mit_ai_risk_merged_df)
