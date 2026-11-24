@@ -66,6 +66,56 @@ TARGET_CODE_TO_NAICS = {
     "National_Security": ["928"]
 }
 
+# Display names for the MIT categories. Several MIT groups span more NAICS
+# sectors than their source names suggest (MIT's "Agriculture" also covers
+# mining, utilities, construction, and manufacturing), so the charts relabel
+# them. TARGET_CODE_TO_NAICS keys stay the join key.
+AI_TARGET_DISPLAY_LABELS = {
+    "Agriculture": "Goods-Producing",
+    "Trade": "Trade & Transportation",
+    "Information": "Information",
+    "Finance": "Finance",
+    "Real_Estate": "Real Estate",
+    "Professional": "Professional Services",
+    "Scientific": "Scientific R&D",
+    "Management": "Management & Admin Services",
+    "Education": "Education",
+    "Health_Care": "Health Care",
+    "Arts": "Arts",
+    "Accommodation": "Accommodation, Food & Other Services",
+    "Public_Admin": "Public Administration",
+    "National_Security": "National Security",
+}
+
+
+def _naics_list(codes):
+    """Collapse NAICS lists into readable ranges (31, 32, 33 -> 31-33)."""
+    ranges = {("31", "32", "33"): "31\u201333", ("44", "45"): "44\u201345",
+              ("48", "49"): "48\u201349",
+              tuple(str(c) for c in range(921, 928)): "921\u2013927"}
+    out, i = [], 0
+    while i < len(codes):
+        for span, label in ranges.items():
+            if tuple(codes[i:i + len(span)]) == span:
+                out.append(label)
+                i += len(span)
+                break
+        else:
+            out.append(codes[i])
+            i += 1
+    return ", ".join(out)
+
+
+# Footnote text built from the mapping above so it cannot drift from the code.
+AI_SECTOR_FOOTNOTE = (
+    "Sector groups follow MIT AI Risk Navigator categories, mapped to NAICS: "
+    + "; ".join(
+        f"{AI_TARGET_DISPLAY_LABELS[k]} = {_naics_list(v)}"
+        for k, v in TARGET_CODE_TO_NAICS.items()
+    )
+    + "."
+)
+
 
 
 # ── Counties ──────────────────────────────────────────────────────────────────

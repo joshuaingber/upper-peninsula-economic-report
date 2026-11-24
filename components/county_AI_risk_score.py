@@ -1,5 +1,12 @@
 import pandas as pd
 
+from data.constants import AI_SECTOR_FOOTNOTE, AI_TARGET_DISPLAY_LABELS
+
+
+def region_display_name(name: str) -> str:
+    """'Upper Peninsula' stays as is; counties get the 'County' suffix."""
+    return name if name == "Upper Peninsula" else f"{name} County"
+
 
 def get_county_risk_data(
     mit_ai_risk_merged_df: pd.DataFrame,
@@ -13,7 +20,7 @@ def get_county_risk_data(
 
 def build_figure(
     county_data: pd.DataFrame,
-    selected_county: str,
+    display_name: str,
     weighted_average: float,
 ):
     import plotly.graph_objects as go
@@ -39,7 +46,7 @@ def build_figure(
     )
 
     fig.update_layout(
-        title=f"{selected_county} County AI Vulnerability by Sector",
+        title=f"{display_name} AI Vulnerability by Sector",
         xaxis_title="AI vulnerability score (1 = low, 5 = high)",
         yaxis_title="Workers represented",
         xaxis={"tickmode": "array", "tickvals": [1, 2, 3, 4, 5]},
@@ -60,15 +67,16 @@ def render_county_ai_risk_score_hist(
     import streamlit as st
 
     county_data = get_county_risk_data(mit_ai_risk_merged_df, selected_county)
+    display_name = region_display_name(selected_county)
 
     if county_data.empty:
-        st.info(f"No AI vulnerability rating data is available for {selected_county} County.")
+        st.info(f"No AI vulnerability rating data is available for {display_name}.")
         return
 
     total_workers = county_data["number_of_workers"].sum()
     weighted_average = county_data["weighted_score"].sum() / total_workers
 
-    fig = build_figure(county_data, selected_county, weighted_average)
+    fig = build_figure(county_data, display_name, weighted_average)
 
     st.markdown(
         f"Employment-weighted average vulnerability score: **{weighted_average:.2f} / 5** "
@@ -81,6 +89,8 @@ def render_county_ai_risk_score_hist(
         county_data[
             ["target_code", "risk_score", "number_of_workers", "weighted_score"]
         ]
+        .assign(target_code=lambda d: d["target_code"].map(AI_TARGET_DISPLAY_LABELS)
+                .fillna(d["target_code"]))
         .rename(
             columns={
                 "target_code": "Sector",
@@ -94,3 +104,4 @@ def render_county_ai_risk_score_hist(
         hide_index=True,
         use_container_width=True,
     )
+    st.caption(AI_SECTOR_FOOTNOTE)

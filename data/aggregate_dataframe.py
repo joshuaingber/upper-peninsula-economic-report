@@ -107,28 +107,14 @@ def get_aggregate_data(df: pd.DataFrame) -> pd.DataFrame:
         ),
     }
 
-    aggregate_df = aggregate_df.sort_values(
-        ["own_code", "industry_code", "agglvl_code",
-         "size_code", "year", "qtr"]
-    ).reset_index(drop=True)
-
-    trend_groups = [
-        "own_code",
-        "industry_code",
-        "agglvl_code",
-        "size_code",
-    ]
-
-    for measure, (change_col, pct_col) in trend_cols.items():
-        prior_year = aggregate_df.groupby(trend_groups)[measure].shift(4)
-
-        aggregate_df[change_col] = aggregate_df[measure] - prior_year
-
-        aggregate_df[pct_col] = (
-            aggregate_df[change_col]
-            / prior_year.replace(0, float("nan"))
-            * 100
-        )
+    # Year-over-year changes use a matched sample. BLS suppresses some
+    # county-industry cells, and a county that is published in one year but
+    # suppressed in the other would otherwise show up as regional growth or
+    # decline (e.g. Marquette health care entering disclosure in 2026 Q1).
+    # For each UP group and quarter, sum the current and prior-year values only
+    # over counties published (not suppressed, non-missing) in both quarters.
+    # Levels above remain the sum of all published counties.
+    aggregate_df = _add_matched_yoy(df, aggregate_df, group_cols, trend_cols)
 
     # Rebuild fields normally created by clean()
     aggregate_df["year_qtr"] = (
@@ -216,3 +202,72 @@ def get_aggregate_data(df: pd.DataFrame) -> pd.DataFrame:
     ).reset_index(drop=True)
 
     return aggregate_df
+
+
+def _add_matched_yoy(df, aggregate_df, group_cols, trend_cols):
+    """Attach matched-sample oty_* change columns to the UP aggregate.
+
+    Prior-year values come from merging each county row with the same county,
+    group, and quarter one year earlier (not a positional shift, so gaps in
+    the quarter sequence cannot misalign years). A county contributes to a
+    measure's change only when that measure is published in both quarters.
+    Average weekly wage change is computed from matched total wages over
+    matched average employment in each year.
+    """
+    emp_cols = ["month1_emplvl", "month2_emplvl", "month3_emplvl"]
+    base_measures = [m for m in trend_cols if m != "avg_wkly_wage"]
+    cols = ["county_name", *group_cols, *base_measures]
+
+    county = df[cols].copy()
+    published = ~df["is_suppressed"].fillna(False).astype(bool)
+    for m in base_measures:
+        county[m] = county[m].where(published)
+
+    prior = county.copy()
+    prior["year"] = prior["year"] + 1
+    paired = county.merge(
+        prior, on=["county_name", *group_cols], how="inner",
+        suffixes=("", "_prior"), validate="one_to_one",
+    )
+
+    sums = {}
+    for m in base_measures:
+        both = paired[m].notna() & paired[f"{m}_prior"].notna()
+        sums[f"{m}__cur"] = paired[m].where(both)
+        sums[f"{m}__prior"] = paired[f"{m}_prior"].where(both)
+
+    # Wage: wages and all three monthly employment figures in both years.
+    wage_cols = ["total_qtrly_wages", *emp_cols]
+    both = paired[wage_cols].notna().all(axis=1) & paired[
+        [f"{c}_prior" for c in wage_cols]
+    ].notna().all(axis=1)
+    sums["wages__cur"] = paired["total_qtrly_wages"].where(both)
+    sums["wages__prior"] = paired["total_qtrly_wages_prior"].where(both)
+    sums["avgemp__cur"] = paired[emp_cols].mean(axis=1).where(both)
+    sums["avgemp__prior"] = paired[[f"{c}_prior" for c in emp_cols]].mean(axis=1).where(both)
+
+    matched = pd.concat([paired[group_cols], pd.DataFrame(sums)], axis=1)
+    matched = matched.groupby(group_cols, as_index=False, dropna=False).sum(min_count=1)
+
+    for m in base_measures:
+        matched[f"{m}__chg"] = matched[f"{m}__cur"] - matched[f"{m}__prior"]
+        matched[f"{m}__pct"] = (
+            matched[f"{m}__chg"] / matched[f"{m}__prior"].replace(0, float("nan")) * 100
+        )
+    wage_cur = matched["wages__cur"] / (matched["avgemp__cur"] * 13).replace(0, float("nan"))
+    wage_prior = matched["wages__prior"] / (matched["avgemp__prior"] * 13).replace(0, float("nan"))
+    matched["avg_wkly_wage__chg"] = wage_cur - wage_prior
+    matched["avg_wkly_wage__pct"] = (
+        matched["avg_wkly_wage__chg"] / wage_prior.replace(0, float("nan")) * 100
+    )
+
+    keep = {}
+    for m, (change_col, pct_col) in trend_cols.items():
+        keep[f"{m}__chg"] = change_col
+        keep[f"{m}__pct"] = pct_col
+    matched = matched[[*group_cols, *keep]].rename(columns=keep)
+
+    aggregate_df = aggregate_df.drop(
+        columns=[c for c in keep.values() if c in aggregate_df.columns]
+    )
+    return aggregate_df.merge(matched, on=group_cols, how="left")

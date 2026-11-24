@@ -145,4 +145,15 @@ def merge_mit_ai_safety_sector_rating_with_qcew(df1: pd.DataFrame, df2: pd.DataF
         validate="one_to_many",
     )
     df["weighted_score"] = df["risk_score"] * df["number_of_workers"]
-    return df
+    df = df[df["county_name"] != "Upper Peninsula"]
+
+    # The ratings exist only county by county, so the region-wide page needs
+    # its own rows: sum workers and weighted scores across the 15 counties.
+    # risk_score is fixed per target_code, so it carries over unchanged.
+    region = (
+        df.groupby(["target_code", "risk_score"], as_index=False)
+        [["number_of_workers", "weighted_score"]]
+        .sum(min_count=1)
+    )
+    region["county_name"] = "Upper Peninsula"
+    return pd.concat([df, region[df.columns]], ignore_index=True)

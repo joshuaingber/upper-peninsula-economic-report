@@ -51,7 +51,7 @@ from data.constants import (
     FAU_ELECTRIC_BLUE, FAU_SKY_BLUE, COUNTY_COLORS, COUNTIES,
     NMU_FONT_FAMILY, GOOGLE_FONTS_IMPORT, PLOTLY_FONT,
     NMU_LINK, NMU_MUTED, NMU_BORDER,
-    SECTOR_RATING_CSV_PATH,
+    SECTOR_RATING_CSV_PATH, AI_TARGET_DISPLAY_LABELS, AI_SECTOR_FOOTNOTE,
 )
 from utils.formatting import fmt_number, fmt_currency, fmt_pct
 from utils.narratives import (
@@ -838,7 +838,7 @@ def build_kpi_card(county_df, county_name, color, secondary=None, housing_df=Non
     if latest.empty:
         return (
             f'<div class="county-card" style="border-left-color: {color};">'
-            f'<h3 style="color: {color};">{display}</h3>'                             # EDIT 2: was {county_name} County
+            f'<h3 style="color: {color};">{display}</h3>'                             # EDIT 2: was {_display_name(county_name)}
             f'<p>No data available.</p></div>'
         )
 
@@ -1011,13 +1011,13 @@ def build_trends(county_df, county_name, county_id, heading_level=2):
     figures = {eid: _fig_json(fig_e), wid: _fig_json(fig_w)}
 
     yr0, yr1 = int(earliest["year"]), int(latest["year"])
-    empl_aria = f"Trend line of total employment in {county_name} County, {yr0} to {yr1}."
+    empl_aria = f"Trend line of total employment in {_display_name(county_name)}, {yr0} to {yr1}."
     wage_aria = (
-        f"Trend line of average annual salary in {county_name} County, "
+        f"Trend line of average annual salary in {_display_name(county_name)}, "
         f"{yr0} to {yr1}, on a logarithmic scale."
     )
     table = _data_table_html(
-        f"{county_name} County — quarterly total employment and average salary",
+        f"{_display_name(county_name)} — quarterly total employment and average salary",
         ["Quarter", "Total Employment", "Average Salary"],
         [
             (r["year_qtr"], fmt_number(r["employment"]), fmt_currency(r["avg_annual_wage"]))
@@ -1078,12 +1078,12 @@ def build_growth_quadrant(county_df, county_name, county_id, heading_level=2):
     figures = {div_id: _fig_json(fig)}
 
     aria = (
-        f"Bubble chart of {len(plot_data)} industries in {county_name} County, "
+        f"Bubble chart of {len(plot_data)} industries in {_display_name(county_name)}, "
         f"{year} Q{qtr}, plotted by year-over-year employment growth (horizontal) "
         f"and wage growth (vertical); bubble size reflects employment."
     )
     table = _data_table_html(
-        f"{county_name} County — industry employment and year-over-year growth, {year} Q{qtr}",
+        f"{_display_name(county_name)} — industry employment and year-over-year growth, {year} Q{qtr}",
         ["Industry", "Employment", "YoY Employment Growth", "YoY Wage Growth"],
         [
             (
@@ -1099,9 +1099,25 @@ def build_growth_quadrant(county_df, county_name, county_id, heading_level=2):
     html = (
         f'<div class="section"><{h}>Industry Landscape<{_h}>'
         f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
-        f"{_chart_div(div_id, aria)}</figure>{table}{SOURCE}{GROWTH_QUADRANT_NOTE}</div>"
+        f"{_chart_div(div_id, aria)}</figure>{table}{SOURCE}{GROWTH_QUADRANT_NOTE}"
+        f"{UP_YOY_NOTE if county_name == UP else ''}</div>"
     )
     return html, figures
+
+
+# Region-wide notes: BLS suppresses some county-industry cells, so U.P. sector
+# totals cover only published county figures, and U.P. year-over-year changes
+# are computed over counties published in both quarters (data/aggregate_dataframe.py).
+UP_LEVEL_NOTE = (
+    '<p class="source"><em>U.P. sector totals sum published county figures; '
+    'county cells suppressed by BLS are excluded.</em></p>'
+)
+UP_YOY_NOTE = (
+    '<p class="source"><em>U.P. sector totals sum published county figures. '
+    'Year-over-year changes use only counties published by BLS in both '
+    'quarters, so a county entering or leaving disclosure does not register '
+    'as growth or decline.</em></p>'
+)
 
 
 # Wraps the firm-formation and treemap methodology texts in source-note paragraphs.
@@ -1165,10 +1181,10 @@ def build_firm_formation(county_df, county_name, county_id, heading_level=2):
 
     aria = (
         f"Bar chart of quarterly establishment additions and losses in "
-        f"{county_name} County, with a net-change line overlay."
+        f"{_display_name(county_name)}, with a net-change line overlay."
     )
     table = _data_table_html(
-        f"{county_name} County — quarterly establishment additions, losses, and net change",
+        f"{_display_name(county_name)} — quarterly establishment additions, losses, and net change",
         ["Quarter", "Establishments Added", "Establishments Lost", "Net Change"],
         [
             (
@@ -1248,16 +1264,16 @@ def build_employment_treemap(county_df, county_name, county_id, heading_level=2)
         )
         year_selector = (
             f'<div class="year-select" role="group" '
-            f'aria-label="Select year for the {county_name} County workforce treemap">'
+            f'aria-label="Select year for the {_display_name(county_name)} workforce treemap">'
             f"{btns}</div>"
         )
 
     aria = (
-        f"Treemap of private-sector employment by industry in {county_name} "
-        f"County, {year} Q{qtr}; rectangle size reflects employment."
+        f"Treemap of private-sector employment by industry in {_display_name(county_name)}"
+        f", {year} Q{qtr}; rectangle size reflects employment."
     )
     table = _data_table_html(
-        f"{county_name} County — private employment by industry sector, {year} Q{qtr}",
+        f"{_display_name(county_name)} — private employment by industry sector, {year} Q{qtr}",
         ["Sector", "Employment", "Share of Private Workforce", "Establishments",
          "Average Salary"],
         [
@@ -1276,7 +1292,8 @@ def build_employment_treemap(county_df, county_name, county_id, heading_level=2)
         f'<div class="section"><{h}>Workforce Composition<{_h}>'
         f'<figure class="chart-figure"><figcaption>{narrative}</figcaption>'
         f"{_chart_div(div_id, aria)}{year_selector}</figure>"
-        f"{table}{SOURCE}{EMPLOYMENT_TREEMAP_NOTE}</div>"
+        f"{table}{SOURCE}{EMPLOYMENT_TREEMAP_NOTE}"
+        f"{UP_LEVEL_NOTE if county_name == UP else ''}</div>"
     )
     return html, figures
 
@@ -1346,9 +1363,9 @@ def build_housing_trends(county_df, county_name, county_id, heading_level=2):
     div_id = f"{county_id}-housing-median-value"
     figures = {div_id: _fig_json(fig)}
 
-    aria = f"Line chart of median home value in {county_name} County, {y0} to {y1}."
+    aria = f"Line chart of median home value in {_display_name(county_name)}, {y0} to {y1}."
     table = _data_table_html(
-        f"{county_name} County — median home value by year",
+        f"{_display_name(county_name)} — median home value by year",
         ["Year", "Median Home Value"],
         [(int(r["year"]), fmt_currency(r["median_home_value"])) for _, r in rows.iterrows()],
     )
@@ -1374,7 +1391,7 @@ def build_ai_risk_score(mit_ai_risk_merged_df, county_name, county_id, heading_l
         return (
             f'<div class="section"><{h}>{title}<{_h}>'
             f'<p>No AI vulnerability rating data is available for '
-            f'{county_name} County.</p></div>',
+            f'{_display_name(county_name)}.</p></div>',
             {},
         )
 
@@ -1387,20 +1404,20 @@ def build_ai_risk_score(mit_ai_risk_merged_df, county_name, county_id, heading_l
     )
 
     div_id = f"{county_id}-ai-risk-score"
-    fig = ai_risk_figure(county_data, county_name, weighted_average)
+    fig = ai_risk_figure(county_data, _display_name(county_name), weighted_average)
     figures = {div_id: _fig_json(fig)}
     aria = (
-        f"Histogram of workers by AI vulnerability score for {county_name} "
-        f"County across {len(county_data)} rated sectors. A dashed vertical "
+        f"Histogram of workers by AI vulnerability score for {_display_name(county_name)} "
+        f"across {len(county_data)} rated sectors. A dashed vertical "
         f"line marks the employment-weighted average score of "
         f"{weighted_average:.2f} out of 5."
     )
     table = _data_table_html(
-        f"{county_name} County — sector AI vulnerability scores and workers",
+        f"{_display_name(county_name)} — sector AI vulnerability scores and workers",
         ["Sector", "Vulnerability Score", "Workers", "Weighted Score Contribution"],
         [
             (
-                row["target_code"],
+                AI_TARGET_DISPLAY_LABELS.get(row["target_code"], row["target_code"]),
                 f'{row["risk_score"]:.2f}',
                 fmt_number(row["number_of_workers"]),
                 fmt_number(row["weighted_score"]),
@@ -1412,6 +1429,7 @@ def build_ai_risk_score(mit_ai_risk_merged_df, county_name, county_id, heading_l
         '<p class="source">Sector vulnerability ratings: '
         '<a href="https://airisk.mit.edu/navigator#/taxonomies">MIT AI Risk '
         'Navigator</a>. Employment: latest published BLS QCEW quarter.</p>'
+        f'<p class="source"><em>{AI_SECTOR_FOOTNOTE}</em></p>'
     )
     html = (
         f'<div class="section"><{h}>{title}<{_h}>'
